@@ -6,6 +6,8 @@
  *
  * All injections use external script files (no inline scripts)
  * to comply with Content Security Policy.
+ *
+ * Also acts as a message bridge between the popup and page-context scripts.
  */
 
 (function () {
@@ -19,11 +21,11 @@
   // ── helpers ──────────────────────────────────
 
   function injectScript(file) {
-    return new Promise((resolve, reject) => {
-      const s = document.createElement('script');
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
       s.src = chrome.runtime.getURL(file);
-      s.onload = () => { s.remove(); resolve(); };
-      s.onerror = (e) => { s.remove(); reject(e); };
+      s.onload = function () { s.remove(); resolve(); };
+      s.onerror = function (e) { s.remove(); reject(e); };
       (document.head || document.documentElement).appendChild(s);
     });
   }
@@ -35,8 +37,8 @@
    */
   function injectDictionary(file, globalName) {
     return fetch(chrome.runtime.getURL(file))
-      .then(r => r.json())
-      .then(data => {
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
         document.dispatchEvent(new CustomEvent('__apexDict', {
           detail: { name: globalName, data: data }
         }));
@@ -62,6 +64,9 @@
       await injectScript('completion-provider.js');
       await injectScript('injected.js');
 
+      // Step 4: Inject language switcher (for popup communication)
+      await injectScript('language-switcher.js');
+
       console.log('[APEX Autocomplete] All scripts injected');
     } catch (err) {
       console.error('[APEX Autocomplete] Injection failed:', err);
@@ -72,13 +77,13 @@
 
   function startMonacoDetection() {
     // Inject the poller as an external script (CSP-safe)
-    injectScript('monaco-poller.js').catch(() => {
+    injectScript('monaco-poller.js').catch(function () {
       console.warn('[APEX Autocomplete] Could not inject Monaco poller');
     });
 
     // Observe the attribute set by the poller from content-script world
-    const obs = new MutationObserver(function () {
-      const val = document.documentElement.getAttribute('data-apex-monaco-ready');
+    var obs = new MutationObserver(function () {
+      var val = document.documentElement.getAttribute('data-apex-monaco-ready');
       if (val) {
         obs.disconnect();
         if (val === '1') {
@@ -95,12 +100,44 @@
     });
 
     // Also check if attribute is already set (race condition)
-    const existing = document.documentElement.getAttribute('data-apex-monaco-ready');
+    var existing = document.documentElement.getAttribute('data-apex-monaco-ready');
     if (existing) {
       obs.disconnect();
       injectAll();
     }
   }
+
+  // ── Message bridge: popup ↔ page context ────
+
+  chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
+    if (msg.type === 'GET_EDITORS') {
+      // Ask the page-context script for editor info
+      var handler = function (e) {
+        document.removeEventListener('__apexEditorsResult', handler);
+        try {
+          var editors = JSON.parse(e.detail);
+          sendResponse({ editors: editors });
+        } catch (err) {
+          sendResponse({ editors: [] });
+        }
+      };
+      document.addEventListener('__apexEditorsResult', handler);
+      document.dispatchEvent(new CustomEvent('__apexGetEditors'));
+      return true; // async response
+    }
+
+    if (msg.type === 'SET_LANGUAGE') {
+      // Tell the page-context script to switch language
+      document.dispatchEvent(new CustomEvent('__apexSetLanguage', {
+        detail: JSON.stringify({
+          editorIndex: msg.editorIndex,
+          languageId: msg.languageId
+        })
+      }));
+      sendResponse({ ok: true });
+      return false;
+    }
+  });
 
   // ── entry point ──────────────────────────────
 

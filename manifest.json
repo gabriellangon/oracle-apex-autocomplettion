@@ -1,9 +1,17 @@
 {
   "manifest_version": 3,
   "name": "APEX Monaco Autocomplete",
-  "version": "1.0.0",
-  "description": "Adds SQL, PL/SQL, and APEX API autocomplete to Oracle APEX Monaco editors",
+  "version": "1.1.0",
+  "description": "Adds SQL, PL/SQL, and APEX API autocomplete to Oracle APEX Monaco editors, with language switching",
   "permissions": [],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    },
+    "default_title": "APEX Autocomplete — Language Switcher"
+  },
   "icons": {
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
@@ -26,6 +34,7 @@
         "completion-provider.js",
         "dict-loader.js",
         "monaco-poller.js",
+        "language-switcher.js",
         "parsers/variable-parser.js",
         "dictionaries/sql-keywords.json",
         "dictionaries/plsql-keywords.json",
