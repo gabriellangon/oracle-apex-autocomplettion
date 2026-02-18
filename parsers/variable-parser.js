@@ -2,146 +2,100 @@
  * parsers/variable-parser.js
  * Extracts declared variables, cursors, parameters, and loop variables
  * from PL/SQL code for autocomplete suggestions.
+ *
+ * Runs in the PAGE context.
  */
 
 (function () {
   'use strict';
 
+  var RESERVED = {
+    'DECLARE':1,'BEGIN':1,'END':1,'EXCEPTION':1,'IF':1,'THEN':1,'ELSIF':1,
+    'ELSE':1,'LOOP':1,'WHILE':1,'FOR':1,'EXIT':1,'CONTINUE':1,'RETURN':1,
+    'NULL':1,'TRUE':1,'FALSE':1,'SELECT':1,'INSERT':1,'UPDATE':1,'DELETE':1,
+    'FROM':1,'WHERE':1,'AND':1,'OR':1,'NOT':1,'IN':1,'OUT':1,'IS':1,'AS':1,
+    'INTO':1,'VALUES':1,'SET':1,'CREATE':1,'ALTER':1,'DROP':1,'TABLE':1,
+    'VIEW':1,'INDEX':1,'SEQUENCE':1,'TRIGGER':1,'PROCEDURE':1,'FUNCTION':1,
+    'PACKAGE':1,'BODY':1,'REPLACE':1,'GRANT':1,'REVOKE':1,'CURSOR':1,
+    'OPEN':1,'FETCH':1,'CLOSE':1,'RAISE':1,'WHEN':1,'OTHERS':1,'PRAGMA':1,
+    'TYPE':1,'SUBTYPE':1,'RECORD':1,'CONSTANT':1,'DEFAULT':1,'COMMIT':1,
+    'ROLLBACK':1,'SAVEPOINT':1,'BULK':1,'COLLECT':1,'FORALL':1,'CASE':1,
+    'WITH':1,'ON':1,'JOIN':1,'LEFT':1,'RIGHT':1,'INNER':1,'OUTER':1,
+    'CROSS':1,'UNION':1,'MINUS':1,'INTERSECT':1,'ORDER':1,'GROUP':1,
+    'HAVING':1,'DISTINCT':1,'ALL':1,'EXISTS':1,'BETWEEN':1,'LIKE':1
+  };
+
+  function isReserved(word) {
+    return RESERVED[word.toUpperCase()] === 1;
+  }
+
   /**
-   * Extract all declared variables from PL/SQL code.
-   * @param {string} code - The full editor content
-   * @returns {Array<{name: string, type: string, line: number}>}
+   * Extract declared variables from PL/SQL code.
+   * @param {string} code
+   * @returns {Array<{name:string, type:string, line:number}>}
    */
   function extractVariables(code) {
-    const variables = [];
-    const seen = new Set(); // avoid duplicates
-    const lines = code.split('\n');
+    if (!code) return [];
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
+    var variables = [];
+    var seen = {};
+    var lines = code.split('\n');
 
-      // Skip empty lines and comments
-      if (!line || line.startsWith('--') || line.startsWith('/*')) continue;
-
-      let match;
-
-      // Pattern 1: variable_name TYPE[(size)][;| := | DEFAULT]
-      // e.g., l_name VARCHAR2(100) := 'test';
-      match = line.match(
-        /^(\w+)\s+(VARCHAR2|NUMBER|INTEGER|PLS_INTEGER|BINARY_INTEGER|DATE|TIMESTAMP|BOOLEAN|CLOB|BLOB|RAW|XMLTYPE|JSON|SYS_REFCURSOR|LONG|CHAR|NVARCHAR2|NCHAR|NCLOB|BINARY_FLOAT|BINARY_DOUBLE|NATURAL|NATURALN|POSITIVE|POSITIVEN|SIGNTYPE|SIMPLE_INTEGER|SIMPLE_FLOAT|SIMPLE_DOUBLE)(\([^)]*\))?\s*(;|:=|DEFAULT)/i
-      );
-      if (match && !isReserved(match[1])) {
-        addVar(match[1], match[2].toUpperCase(), i + 1);
-        continue;
+    function add(name, type, lineNum) {
+      var key = name.toUpperCase();
+      if (!seen[key] && !isReserved(name)) {
+        seen[key] = true;
+        variables.push({ name: name, type: type, line: lineNum });
       }
-
-      // Pattern 2: variable_name table.column%TYPE
-      match = line.match(
-        /^(\w+)\s+(\w+\.\w+)%TYPE\s*(;|:=|DEFAULT)/i
-      );
-      if (match && !isReserved(match[1])) {
-        addVar(match[1], match[2] + '%TYPE', i + 1);
-        continue;
-      }
-
-      // Pattern 3: variable_name table%ROWTYPE
-      match = line.match(
-        /^(\w+)\s+(\w+)%ROWTYPE\s*(;|:=)/i
-      );
-      if (match && !isReserved(match[1])) {
-        addVar(match[1], match[2] + '%ROWTYPE', i + 1);
-        continue;
-      }
-
-      // Pattern 4: CURSOR cursor_name IS
-      match = line.match(
-        /^CURSOR\s+(\w+)\s+IS/i
-      );
-      if (match) {
-        addVar(match[1], 'CURSOR', i + 1);
-        continue;
-      }
-
-      // Pattern 5: FOR rec IN (cursor/query)
-      match = line.match(
-        /^FOR\s+(\w+)\s+IN\s/i
-      );
-      if (match) {
-        addVar(match[1], 'RECORD (loop)', i + 1);
-        continue;
-      }
-
-      // Pattern 6: FOR i IN 1..N LOOP (numeric loop)
-      match = line.match(
-        /^FOR\s+(\w+)\s+IN\s+(\d+|REVERSE)\s*\.\./i
-      );
-      if (match) {
-        addVar(match[1], 'PLS_INTEGER (loop)', i + 1);
-        continue;
-      }
-
-      // Pattern 7: parameter_name IN/OUT/IN OUT TYPE
-      // (inside procedure/function declarations)
-      match = line.match(
-        /^\s*(\w+)\s+(IN\s+OUT|IN|OUT)\s+(\w+)/i
-      );
-      if (match && !isReserved(match[1])) {
-        addVar(match[1], match[3].toUpperCase(), i + 1);
-        continue;
-      }
-
-      // Pattern 8: variable_name CONSTANT TYPE := value;
-      match = line.match(
-        /^(\w+)\s+CONSTANT\s+(\w+)(\([^)]*\))?\s*(;|:=)/i
-      );
-      if (match && !isReserved(match[1])) {
-        addVar(match[1], match[2].toUpperCase() + ' (constant)', i + 1);
-        continue;
-      }
-
-      // Pattern 9: TYPE type_name IS RECORD/TABLE OF/VARRAY
-      match = line.match(
-        /^TYPE\s+(\w+)\s+IS\s+(RECORD|TABLE\s+OF|VARRAY)/i
-      );
-      if (match) {
-        addVar(match[1], 'TYPE (' + match[2].toUpperCase() + ')', i + 1);
-        continue;
-      }
-
-      // Pattern 10: variable_name custom_type_name; (after TYPE declarations)
-      // This is harder to detect without full parsing, skip for MVP
     }
 
-    function addVar(name, type, line) {
-      const key = name.toUpperCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-        variables.push({ name: name, type: type, line: line });
+    for (var i = 0; i < lines.length; i++) {
+      var raw = lines[i];
+      var line = raw.replace(/^\s+/, ''); // ltrim
+      var lineNum = i + 1;
+      var m;
+
+      // Skip empty / comments
+      if (!line || line.indexOf('--') === 0) continue;
+
+      // 1. variable_name CONSTANT? TYPE[(size)] [:= | DEFAULT | ;]
+      m = line.match(
+        /^(\w+)\s+(?:CONSTANT\s+)?(VARCHAR2|NUMBER|INTEGER|PLS_INTEGER|BINARY_INTEGER|DATE|TIMESTAMP|BOOLEAN|CLOB|BLOB|RAW|XMLTYPE|JSON|SYS_REFCURSOR|LONG|CHAR|NVARCHAR2|NCHAR|NCLOB|BINARY_FLOAT|BINARY_DOUBLE|SIMPLE_INTEGER|SIMPLE_FLOAT|SIMPLE_DOUBLE|NATURAL|NATURALN|POSITIVE|POSITIVEN|SIGNTYPE)(\([^)]*\))?\s*(;|:=|DEFAULT)/i
+      );
+      if (m) { add(m[1], m[2].toUpperCase(), lineNum); continue; }
+
+      // 2. variable_name table.column%TYPE
+      m = line.match(/^(\w+)\s+(\w+\.\w+)%TYPE\s*(;|:=|DEFAULT)/i);
+      if (m) { add(m[1], m[2] + '%TYPE', lineNum); continue; }
+
+      // 3. variable_name table%ROWTYPE
+      m = line.match(/^(\w+)\s+(\w+)%ROWTYPE\s*(;|:=)/i);
+      if (m) { add(m[1], m[2] + '%ROWTYPE', lineNum); continue; }
+
+      // 4. CURSOR cursor_name IS
+      m = line.match(/^CURSOR\s+(\w+)\s+IS/i);
+      if (m) { add(m[1], 'CURSOR', lineNum); continue; }
+
+      // 5. FOR rec IN ...
+      m = line.match(/^FOR\s+(\w+)\s+IN\s/i);
+      if (m) { add(m[1], 'RECORD (loop)', lineNum); continue; }
+
+      // 6. param_name IN/OUT/IN OUT TYPE
+      m = line.match(/^\s*(\w+)\s+(IN\s+OUT|IN|OUT)\s+(\w+)/i);
+      if (m && !isReserved(m[1])) {
+        add(m[1], m[3].toUpperCase(), lineNum);
+        continue;
       }
+
+      // 7. TYPE type_name IS RECORD|TABLE OF|VARRAY
+      m = line.match(/^TYPE\s+(\w+)\s+IS\s+(RECORD|TABLE\s+OF|VARRAY)/i);
+      if (m) { add(m[1], 'TYPE (' + m[2].toUpperCase() + ')', lineNum); continue; }
     }
 
     return variables;
   }
 
-  /**
-   * Check if a word is a reserved PL/SQL keyword (to avoid false positives).
-   */
-  const RESERVED_WORDS = new Set([
-    'DECLARE', 'BEGIN', 'END', 'EXCEPTION', 'IF', 'THEN', 'ELSIF', 'ELSE',
-    'LOOP', 'WHILE', 'FOR', 'EXIT', 'CONTINUE', 'RETURN', 'NULL', 'TRUE',
-    'FALSE', 'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'FROM', 'WHERE', 'AND',
-    'OR', 'NOT', 'IN', 'OUT', 'IS', 'AS', 'INTO', 'VALUES', 'SET', 'CREATE',
-    'ALTER', 'DROP', 'TABLE', 'VIEW', 'INDEX', 'SEQUENCE', 'TRIGGER',
-    'PROCEDURE', 'FUNCTION', 'PACKAGE', 'BODY', 'REPLACE', 'GRANT', 'REVOKE',
-    'CURSOR', 'OPEN', 'FETCH', 'CLOSE', 'RAISE', 'WHEN', 'OTHERS', 'PRAGMA',
-    'TYPE', 'SUBTYPE', 'RECORD', 'CONSTANT', 'DEFAULT', 'COMMIT', 'ROLLBACK',
-    'SAVEPOINT', 'BULK', 'COLLECT', 'FORALL', 'CASE', 'WITH'
-  ]);
-
-  function isReserved(word) {
-    return RESERVED_WORDS.has(word.toUpperCase());
-  }
-
-  // Expose globally
   window.__extractVariables = extractVariables;
+
+  console.log('[APEX Autocomplete] variable-parser.js loaded');
 })();

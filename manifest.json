@@ -24,6 +24,8 @@
       "resources": [
         "injected.js",
         "completion-provider.js",
+        "dict-loader.js",
+        "monaco-poller.js",
         "parsers/variable-parser.js",
         "dictionaries/sql-keywords.json",
         "dictionaries/plsql-keywords.json",

@@ -1,253 +1,207 @@
 /**
  * completion-provider.js
- * Core autocomplete logic. Registers a Monaco CompletionItemProvider
- * that merges SQL keywords, PL/SQL keywords, APEX API, and declared variables.
+ * Core autocomplete logic. Builds Monaco CompletionItemProvider
+ * from SQL/PL/SQL keywords, APEX API dictionaries, and live variables.
+ *
+ * Runs in the PAGE context (has access to window.monaco).
  */
 
 (function () {
   'use strict';
 
-  // ─────────────────────────────────────────────
-  // Monaco CompletionItemKind mapping
-  // ─────────────────────────────────────────────
+  // ── CompletionItemKind mapping ───────────────
+
   function getKind(monaco, category) {
-    const map = {
-      // SQL
-      dml: monaco.languages.CompletionItemKind.Keyword,
-      clause: monaco.languages.CompletionItemKind.Keyword,
-      join: monaco.languages.CompletionItemKind.Keyword,
-      set: monaco.languages.CompletionItemKind.Keyword,
-      condition: monaco.languages.CompletionItemKind.Keyword,
-      expression: monaco.languages.CompletionItemKind.Keyword,
-      alias: monaco.languages.CompletionItemKind.Keyword,
-      modifier: monaco.languages.CompletionItemKind.Keyword,
-      logical: monaco.languages.CompletionItemKind.Keyword,
-      ddl: monaco.languages.CompletionItemKind.Keyword,
-      dcl: monaco.languages.CompletionItemKind.Keyword,
-      tcl: monaco.languages.CompletionItemKind.Keyword,
-
-      // PL/SQL
-      block: monaco.languages.CompletionItemKind.Keyword,
-      control: monaco.languages.CompletionItemKind.Keyword,
-      loop: monaco.languages.CompletionItemKind.Keyword,
-      cursor: monaco.languages.CompletionItemKind.Keyword,
-      cursor_attr: monaco.languages.CompletionItemKind.Property,
-      type_attr: monaco.languages.CompletionItemKind.Property,
-      bulk: monaco.languages.CompletionItemKind.Keyword,
-      type: monaco.languages.CompletionItemKind.TypeParameter,
-      composite_type: monaco.languages.CompletionItemKind.Struct,
-      exception: monaco.languages.CompletionItemKind.Event,
-      program_unit: monaco.languages.CompletionItemKind.Keyword,
-      parameter: monaco.languages.CompletionItemKind.Keyword,
-      builtin_pkg: monaco.languages.CompletionItemKind.Function,
-      function: monaco.languages.CompletionItemKind.Function,
-      analytic: monaco.languages.CompletionItemKind.Function,
-
-      // APEX API
-      apex_proc: monaco.languages.CompletionItemKind.Method,
-      apex_func: monaco.languages.CompletionItemKind.Function,
-      apex_pkg: monaco.languages.CompletionItemKind.Module,
-
-      // Variables
-      variable: monaco.languages.CompletionItemKind.Variable,
-
-      // Snippets
-      snippet: monaco.languages.CompletionItemKind.Snippet,
+    var K = monaco.languages.CompletionItemKind;
+    var map = {
+      dml: K.Keyword, clause: K.Keyword, join: K.Keyword,
+      set: K.Keyword, condition: K.Keyword, expression: K.Keyword,
+      alias: K.Keyword, modifier: K.Keyword, logical: K.Keyword,
+      ddl: K.Keyword, dcl: K.Keyword, tcl: K.Keyword, dynamic: K.Keyword,
+      block: K.Keyword, control: K.Keyword, loop: K.Keyword,
+      cursor: K.Keyword, cursor_attr: K.Property, type_attr: K.Property,
+      bulk: K.Keyword, type: K.TypeParameter, composite_type: K.Struct,
+      exception: K.Event, program_unit: K.Keyword, parameter: K.Keyword,
+      builtin_pkg: K.Function, 'function': K.Function, analytic: K.Function,
+      apex_proc: K.Method, apex_func: K.Function, apex_pkg: K.Module,
+      variable: K.Variable, snippet: K.Snippet
     };
-    return map[category] || monaco.languages.CompletionItemKind.Text;
+    return map[category] || K.Text;
   }
 
-  // ─────────────────────────────────────────────
-  // Build completion items from dictionaries
-  // ─────────────────────────────────────────────
+  // ── Build items from dictionaries ────────────
 
   function buildKeywordItems(monaco, dict) {
     if (!dict || !dict.keywords) return [];
-    return dict.keywords.map((kw) => ({
-      label: kw.label,
-      kind: getKind(monaco, kw.category),
-      detail: kw.detail || kw.category,
-      insertText: kw.label,
-      sortText: '2_' + kw.label, // keywords after variables
-      filterText: kw.label,
-      _source: 'keyword',
-    }));
+    return dict.keywords.map(function (kw) {
+      return {
+        label:      kw.label,
+        kind:       getKind(monaco, kw.category),
+        detail:     kw.detail || kw.category,
+        insertText: kw.label,
+        sortText:   '2_' + kw.label,
+        filterText: kw.label
+      };
+    });
   }
 
   function buildSnippetItems(monaco, dict) {
     if (!dict || !dict.snippets) return [];
-    return dict.snippets.map((sn) => ({
-      label: sn.label,
-      kind: monaco.languages.CompletionItemKind.Snippet,
-      detail: sn.detail || 'Snippet',
-      insertText: sn.insertText,
-      insertTextRules:
-        monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-      sortText: '4_' + sn.label,
-      documentation: sn.detail,
-      _source: 'snippet',
-    }));
+    return dict.snippets.map(function (sn) {
+      return {
+        label:           sn.label,
+        kind:            monaco.languages.CompletionItemKind.Snippet,
+        detail:          sn.detail || 'Snippet',
+        insertText:      sn.insertText,
+        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        sortText:        '4_' + sn.label,
+        documentation:   sn.detail || ''
+      };
+    });
   }
 
-  function buildApexApiItems(monaco, apiDict) {
+  function buildApexItems(monaco, apiDict) {
     if (!apiDict || !apiDict.packages) return [];
-    const items = [];
-    for (const pkg of apiDict.packages) {
-      // Package name itself as completion
+    var items = [];
+    apiDict.packages.forEach(function (pkg) {
       items.push({
-        label: pkg.name,
-        kind: getKind(monaco, 'apex_pkg'),
-        detail: 'APEX Package',
+        label:      pkg.name,
+        kind:       getKind(monaco, 'apex_pkg'),
+        detail:     'APEX Package',
         insertText: pkg.name,
-        sortText: '3_' + pkg.name,
-        _source: 'apex_api',
+        sortText:   '3_' + pkg.name
       });
-
-      if (!pkg.procedures) continue;
-      for (const proc of pkg.procedures) {
+      if (!pkg.procedures) return;
+      pkg.procedures.forEach(function (proc) {
+        var isFunc = proc.signature && proc.signature.indexOf('RETURN') !== -1;
         items.push({
-          label: proc.label,
-          kind: getKind(
-            monaco,
-            proc.signature && proc.signature.includes('RETURN')
-              ? 'apex_func'
-              : 'apex_proc'
-          ),
-          detail: proc.detail || proc.label,
-          insertText: proc.label,
-          documentation: proc.signature || '',
-          sortText: '3_' + proc.label,
-          _source: 'apex_api',
+          label:         proc.label,
+          kind:          getKind(monaco, isFunc ? 'apex_func' : 'apex_proc'),
+          detail:        proc.detail || proc.label,
+          insertText:    proc.label,
+          documentation: { value: '```\n' + (proc.signature || '') + '\n```' },
+          sortText:      '3_' + proc.label
         });
-      }
-    }
+      });
+    });
     return items;
   }
 
   function buildVariableItems(monaco, variables) {
-    return variables.map((v) => ({
-      label: v.name,
-      kind: getKind(monaco, 'variable'),
-      detail: v.type + ' (line ' + v.line + ')',
-      insertText: v.name,
-      sortText: '1_' + v.name, // variables first
-      _source: 'variable',
-    }));
+    return variables.map(function (v) {
+      return {
+        label:      v.name,
+        kind:       getKind(monaco, 'variable'),
+        detail:     v.type + ' (line ' + v.line + ')',
+        insertText: v.name,
+        sortText:   '1_' + v.name   // variables first
+      };
+    });
   }
 
-  // ─────────────────────────────────────────────
-  // Get the current word being typed
-  // ─────────────────────────────────────────────
+  // ── Package-dot lookup ───────────────────────
 
-  function getCurrentWord(model, position) {
-    const wordInfo = model.getWordUntilPosition(position);
-    return wordInfo ? wordInfo.word : '';
+  function buildPackageMap(monaco, apiDict) {
+    var map = {};
+    if (!apiDict || !apiDict.packages) return map;
+    apiDict.packages.forEach(function (pkg) {
+      if (!pkg.procedures) return;
+      map[pkg.name.toUpperCase()] = pkg.procedures.map(function (proc) {
+        var shortName = proc.label.indexOf('.') !== -1
+          ? proc.label.split('.').pop()
+          : proc.label;
+        var isFunc = proc.signature && proc.signature.indexOf('RETURN') !== -1;
+        return {
+          label:         shortName,
+          kind:          isFunc ? monaco.languages.CompletionItemKind.Function
+                                : monaco.languages.CompletionItemKind.Method,
+          detail:        proc.detail || '',
+          insertText:    shortName,
+          documentation: { value: '```\n' + (proc.signature || '') + '\n```' },
+          sortText:      '1_' + shortName
+        };
+      });
+    });
+    return map;
   }
 
-  // ─────────────────────────────────────────────
-  // Check if we're typing after a dot (for package.procedure)
-  // ─────────────────────────────────────────────
+  // ── Detect package prefix before cursor ──────
 
   function getPackagePrefix(model, position) {
-    const lineContent = model.getLineContent(position.lineNumber);
-    const textBefore = lineContent.substring(0, position.column - 1);
-    // Match APEX_SOMETHING. or DBMS_SOMETHING.
-    const dotMatch = textBefore.match(/(\w+)\.\s*$/);
-    if (dotMatch) {
-      return dotMatch[1].toUpperCase();
-    }
+    var line = model.getLineContent(position.lineNumber);
+    var before = line.substring(0, position.column - 1);
+    // Match "WORD." at the end, including after the user typed the dot
+    var m = before.match(/(\w+)\.\w*$/);
+    if (m) return m[1].toUpperCase();
+    // Also match if cursor is right after the dot: "APEX_JSON.|"
+    m = before.match(/(\w+)\.$/);
+    if (m) return m[1].toUpperCase();
     return null;
   }
 
-  // ─────────────────────────────────────────────
-  // Main provider registration
-  // ─────────────────────────────────────────────
+  // ── Range helper ─────────────────────────────
+
+  function getRange(model, position) {
+    var info = model.getWordUntilPosition(position);
+    return {
+      startLineNumber: position.lineNumber,
+      endLineNumber:   position.lineNumber,
+      startColumn:     info.startColumn,
+      endColumn:       position.column
+    };
+  }
+
+  // ── Create the provider ──────────────────────
 
   function createCompletionProvider(monaco) {
-    // Pre-build static items
-    const sqlItems = buildKeywordItems(monaco, window.__sqlKeywords);
-    const plsqlItems = buildKeywordItems(monaco, window.__plsqlKeywords);
-    const plsqlSnippets = buildSnippetItems(monaco, window.__plsqlKeywords);
-    const apexItems = buildApexApiItems(monaco, window.__apexApi);
+    var sqlItems    = buildKeywordItems(monaco, window.__sqlKeywords);
+    var plsqlItems  = buildKeywordItems(monaco, window.__plsqlKeywords);
+    var snippets    = buildSnippetItems(monaco, window.__plsqlKeywords);
+    var apexItems   = buildApexItems(monaco, window.__apexApi);
+    var staticItems = sqlItems.concat(plsqlItems).concat(snippets).concat(apexItems);
+    var packageMap  = buildPackageMap(monaco, window.__apexApi);
 
-    // Combine all static items
-    const allStaticItems = [...sqlItems, ...plsqlItems, ...plsqlSnippets, ...apexItems];
-
-    // Build a lookup: package name -> procedures
-    const packageProcMap = {};
-    if (window.__apexApi && window.__apexApi.packages) {
-      for (const pkg of window.__apexApi.packages) {
-        if (pkg.procedures) {
-          packageProcMap[pkg.name.toUpperCase()] = pkg.procedures.map(
-            (proc) => ({
-              label: proc.label.split('.').pop(), // just the procedure name
-              fullLabel: proc.label,
-              kind:
-                proc.signature && proc.signature.includes('RETURN')
-                  ? monaco.languages.CompletionItemKind.Function
-                  : monaco.languages.CompletionItemKind.Method,
-              detail: proc.detail || '',
-              insertText: proc.label.split('.').pop(),
-              documentation: proc.signature || '',
-              sortText: '1_' + proc.label,
-              _source: 'apex_api',
-            })
-          );
-        }
-      }
-    }
+    console.log('[APEX Autocomplete] Provider built:',
+      sqlItems.length, 'SQL +',
+      plsqlItems.length, 'PL/SQL +',
+      snippets.length, 'snippets +',
+      apexItems.length, 'APEX API =',
+      staticItems.length, 'total items');
 
     return {
-      triggerCharacters: ['.', '_'],
+      triggerCharacters: ['.'],
 
-      provideCompletionItems: function (model, position, context, token) {
-        const word = getCurrentWord(model, position);
-        const pkgPrefix = getPackagePrefix(model, position);
+      provideCompletionItems: function (model, position) {
+        var range = getRange(model, position);
+        var pkgPrefix = getPackagePrefix(model, position);
 
-        // If typing after a dot (e.g., APEX_JSON.), show only that package's procs
-        if (pkgPrefix && packageProcMap[pkgPrefix]) {
-          const range = getRange(model, position);
+        // After a dot → show only that package's members
+        if (pkgPrefix && packageMap[pkgPrefix]) {
           return {
-            suggestions: packageProcMap[pkgPrefix].map((item) => ({
-              ...item,
-              range: range,
-            })),
+            suggestions: packageMap[pkgPrefix].map(function (item) {
+              return Object.assign({}, item, { range: range });
+            })
           };
         }
 
-        // Otherwise, combine static items + dynamic variables
-        const code = model.getValue();
-        const variables = window.__extractVariables
-          ? window.__extractVariables(code)
-          : [];
-        const variableItems = buildVariableItems(monaco, variables);
+        // General completion: static items + live variables
+        var code = model.getValue();
+        var vars = (typeof window.__extractVariables === 'function')
+          ? window.__extractVariables(code) : [];
+        var varItems = buildVariableItems(monaco, vars);
 
-        const allItems = [...variableItems, ...allStaticItems];
-        const range = getRange(model, position);
-
+        var all = varItems.concat(staticItems);
         return {
-          suggestions: allItems.map((item) => ({
-            ...item,
-            range: range,
-          })),
+          suggestions: all.map(function (item) {
+            return Object.assign({}, item, { range: range });
+          })
         };
-      },
+      }
     };
   }
 
-  /**
-   * Compute the replacement range for the current word.
-   */
-  function getRange(model, position) {
-    const wordInfo = model.getWordUntilPosition(position);
-    return {
-      startLineNumber: position.lineNumber,
-      endLineNumber: position.lineNumber,
-      startColumn: wordInfo.startColumn,
-      endColumn: position.column,
-    };
-  }
-
-  // Expose
+  // Expose to injected.js
   window.__createCompletionProvider = createCompletionProvider;
+
+  console.log('[APEX Autocomplete] completion-provider.js loaded');
 })();

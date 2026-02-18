@@ -1,268 +1,260 @@
 /**
  * injected.js
- * Runs in the page context (not the extension isolated world).
- * Has direct access to window.monaco and editor instances.
- * Hooks into existing and future Monaco editors to register autocomplete.
+ * Runs in the PAGE context (MAIN world).
+ * Has direct access to window.monaco.
+ * Registers the completion provider and configures editors.
  */
 
 (function () {
   'use strict';
 
-  // Avoid double execution
   if (window.__apexAutocompleteActive) return;
   window.__apexAutocompleteActive = true;
 
-  const LOG_PREFIX = '[APEX Autocomplete]';
-  const registeredEditors = new WeakSet();
-  let providerDisposable = null;
+  var LOG = '[APEX Autocomplete]';
+  var configuredEditors = new WeakSet();
+  var disposables = [];
 
-  // ─────────────────────────────────────────────
-  // Editor language detection
-  // ─────────────────────────────────────────────
+  // ── Language detection ───────────────────────
 
-  function getEditorLanguage(editor) {
-    const model = editor.getModel();
-    if (!model) return 'unknown';
+  function isPlsqlEditor(editor) {
+    var model = editor.getModel();
+    if (!model) return true; // assume PL/SQL if no model
 
-    // Monaco in APEX assigns a language ID to the model
-    const languageId = model.getLanguageId();
-    if (languageId && languageId !== 'plaintext') {
-      // APEX typically uses 'plsql' or 'sql' or 'javascript'
-      if (
-        languageId.includes('sql') ||
-        languageId.includes('plsql') ||
-        languageId === 'oracle'
-      ) {
-        return 'plsql';
+    // Check Monaco language ID
+    var langId = '';
+    if (typeof model.getLanguageId === 'function') {
+      langId = model.getLanguageId();
+    } else if (model.getLanguageIdentifier) {
+      // Older Monaco API
+      langId = model.getLanguageIdentifier().language || '';
+    }
+
+    if (langId) {
+      var l = langId.toLowerCase();
+      if (l === 'javascript' || l === 'typescript' || l === 'css' ||
+          l === 'html' || l === 'json') {
+        return false;
       }
-      if (languageId === 'javascript' || languageId === 'typescript') {
-        return 'javascript';
+      if (l.indexOf('sql') !== -1 || l.indexOf('plsql') !== -1 ||
+          l === 'oracle' || l === 'plaintext') {
+        return true;
       }
-      return languageId;
     }
 
-    // Fallback: analyze content
-    const content = model.getValue().toUpperCase().substring(0, 2000);
+    // Fallback: content sniffing
+    var content = model.getValue();
+    if (content.length > 2000) content = content.substring(0, 2000);
+    content = content.toUpperCase();
 
-    if (
-      content.includes('DECLARE') ||
-      content.includes('BEGIN') ||
-      content.includes('CREATE OR REPLACE') ||
-      (content.includes('SELECT') && !content.includes('{'))
-    ) {
-      return 'plsql';
+    if (content.indexOf('FUNCTION') !== -1 && content.indexOf('{') !== -1) {
+      return false; // likely JavaScript
     }
-
-    if (content.includes('FUNCTION') && content.includes('{')) {
-      return 'javascript';
-    }
-
-    // Default to PL/SQL — most common in APEX
-    return 'plsql';
+    return true; // default to PL/SQL
   }
 
-  // ─────────────────────────────────────────────
-  // Register completion provider
-  // ─────────────────────────────────────────────
+  // ── Get all registered languages ─────────────
 
-  function registerCompletions() {
-    if (!window.monaco) {
-      console.warn(LOG_PREFIX, 'Monaco not available');
-      return;
-    }
-
-    if (providerDisposable) {
-      // Already registered globally
-      return;
-    }
-
-    if (!window.__createCompletionProvider) {
-      console.warn(LOG_PREFIX, 'Completion provider not loaded');
-      return;
-    }
-
-    const provider = window.__createCompletionProvider(window.monaco);
-
-    // Register for multiple language IDs that APEX might use
-    const languages = ['plsql', 'sql', 'oracle', 'oraclesql', 'plaintext'];
-
-    for (const lang of languages) {
-      try {
-        providerDisposable = window.monaco.languages.registerCompletionItemProvider(
-          lang,
-          provider
-        );
-        console.log(LOG_PREFIX, `Registered completion provider for "${lang}"`);
-      } catch (e) {
-        // Language might not be registered, that's OK
-        console.debug(LOG_PREFIX, `Could not register for "${lang}":`, e.message);
-      }
-    }
-
-    // Also register for any language (fallback)
+  function getRegisteredLanguages() {
     try {
-      window.monaco.languages.registerCompletionItemProvider('*', {
-        ...provider,
-        provideCompletionItems: function (model, position, context, token) {
-          // Only provide completions for PL/SQL-like editors
-          const editor = findEditorForModel(model);
-          if (editor && getEditorLanguage(editor) !== 'plsql') {
-            return { suggestions: [] };
-          }
-          return provider.provideCompletionItems(model, position, context, token);
-        },
-      });
-      console.log(LOG_PREFIX, 'Registered wildcard completion provider');
+      return monaco.languages.getLanguages().map(function (l) { return l.id; });
     } catch (e) {
-      console.debug(LOG_PREFIX, 'Wildcard registration failed:', e.message);
+      return [];
     }
   }
 
-  // ─────────────────────────────────────────────
-  // Find all Monaco editors on the page
-  // ─────────────────────────────────────────────
+  // ── Register completion provider ─────────────
 
-  function findEditorForModel(model) {
-    if (!window.monaco || !window.monaco.editor) return null;
-    const editors = window.monaco.editor.getEditors
-      ? window.monaco.editor.getEditors()
-      : [];
-    for (const ed of editors) {
-      if (ed.getModel() === model) return ed;
+  function registerProvider() {
+    if (!window.monaco || !window.monaco.languages) {
+      console.warn(LOG, 'Monaco not available');
+      return false;
     }
-    return null;
-  }
-
-  function findAllEditors() {
-    if (!window.monaco || !window.monaco.editor) return [];
-
-    // Method 1: Monaco's getEditors() API (Monaco 0.21+)
-    if (window.monaco.editor.getEditors) {
-      return window.monaco.editor.getEditors();
+    if (!window.__createCompletionProvider) {
+      console.warn(LOG, 'Completion provider not loaded');
+      return false;
     }
 
-    // Method 2: Query DOM for Monaco containers and find editors
-    const containers = document.querySelectorAll('.monaco-editor');
-    const editors = [];
-    containers.forEach((el) => {
-      // APEX stores editor references in various ways
-      const parent = el.closest('.apex-item-code-editor, .a-MonacoEditor');
-      if (parent && parent._editor) {
-        editors.push(parent._editor);
+    var provider = window.__createCompletionProvider(window.monaco);
+
+    // Wrap provider to filter out non-PL/SQL editors
+    var filteredProvider = {
+      triggerCharacters: provider.triggerCharacters,
+      provideCompletionItems: function (model, position, context, token) {
+        // Find the editor for this model and check language
+        var editors = getEditors();
+        for (var i = 0; i < editors.length; i++) {
+          if (editors[i].getModel() === model) {
+            if (!isPlsqlEditor(editors[i])) {
+              return { suggestions: [] };
+            }
+            break;
+          }
+        }
+        return provider.provideCompletionItems(model, position, context, token);
+      }
+    };
+
+    // Register for known language IDs
+    var targets = ['plsql', 'sql', 'oracle', 'oraclesql', 'plaintext'];
+    var registered = getRegisteredLanguages();
+    var count = 0;
+
+    targets.forEach(function (lang) {
+      // Only register if language exists or is 'plaintext' (always exists)
+      if (lang === 'plaintext' || registered.indexOf(lang) !== -1) {
+        try {
+          var d = monaco.languages.registerCompletionItemProvider(lang, filteredProvider);
+          disposables.push(d);
+          count++;
+          console.log(LOG, 'Registered for "' + lang + '"');
+        } catch (e) {
+          console.debug(LOG, 'Skip "' + lang + '":', e.message);
+        }
       }
     });
-    return editors;
+
+    // If none of the SQL languages were found, register on plaintext
+    // which is the fallback APEX sometimes uses
+    if (count === 0) {
+      try {
+        var d = monaco.languages.registerCompletionItemProvider('plaintext', filteredProvider);
+        disposables.push(d);
+        console.log(LOG, 'Registered for "plaintext" (fallback)');
+        count++;
+      } catch (e) {
+        console.error(LOG, 'Could not register any provider:', e.message);
+      }
+    }
+
+    return count > 0;
   }
 
-  // ─────────────────────────────────────────────
-  // Configure editor settings for better autocomplete UX
-  // ─────────────────────────────────────────────
+  // ── Find editors ─────────────────────────────
+
+  function getEditors() {
+    if (!window.monaco || !window.monaco.editor) return [];
+
+    // Monaco >= 0.21
+    if (typeof monaco.editor.getEditors === 'function') {
+      return monaco.editor.getEditors();
+    }
+
+    // Fallback: walk DOM
+    var results = [];
+    var nodes = document.querySelectorAll('.monaco-editor');
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      // APEX wraps editors; look for _editor on various ancestors
+      var parent = el.closest('.a-MonacoEditor') ||
+                   el.closest('.apex-item-code-editor') ||
+                   el.closest('[data-item-id]') ||
+                   el.parentElement;
+      if (parent) {
+        // Try common APEX storage patterns
+        var ed = parent._editor || parent.__monacoEditor;
+        if (ed) { results.push(ed); continue; }
+
+        // Also try to get it from the widget node
+        if (el._modelData && el._modelData.editor) {
+          results.push(el._modelData.editor);
+        }
+      }
+    }
+    return results;
+  }
+
+  // ── Configure editor for autocomplete UX ─────
 
   function configureEditor(editor) {
-    if (registeredEditors.has(editor)) return;
-    registeredEditors.add(editor);
+    if (configuredEditors.has(editor)) return;
+    configuredEditors.add(editor);
+
+    if (!isPlsqlEditor(editor)) {
+      console.log(LOG, 'Skipping non-PL/SQL editor');
+      return;
+    }
 
     try {
-      // Enable quick suggestions (show completions as you type)
       editor.updateOptions({
-        quickSuggestions: {
-          other: true,
-          comments: false,
-          strings: false,
-        },
+        quickSuggestions: { other: true, comments: false, strings: false },
         suggestOnTriggerCharacters: true,
-        wordBasedSuggestions: 'currentDocument',
+        wordBasedSuggestions: true,
         suggest: {
           showKeywords: true,
           showSnippets: true,
           showFunctions: true,
           showVariables: true,
           showMethods: true,
-          insertMode: 'replace',
           filterGraceful: true,
-          snippetsPreventQuickSuggestions: false,
+          snippetsPreventQuickSuggestions: false
         },
         acceptSuggestionOnEnter: 'on',
-        tabCompletion: 'on',
+        tabCompletion: 'on'
       });
-
-      const lang = getEditorLanguage(editor);
-      console.log(
-        LOG_PREFIX,
-        `Configured editor (language: ${lang}, model: ${editor.getModel()?.uri?.toString()})`
-      );
+      console.log(LOG, 'Configured editor');
     } catch (e) {
-      console.debug(LOG_PREFIX, 'Could not configure editor:', e.message);
+      console.debug(LOG, 'Configure error:', e.message);
     }
   }
 
-  // ─────────────────────────────────────────────
-  // Main initialization
-  // ─────────────────────────────────────────────
+  // ── Init ─────────────────────────────────────
 
   function init() {
     if (!window.monaco) {
-      console.warn(LOG_PREFIX, 'Monaco not found, retrying...');
+      console.warn(LOG, 'Monaco not found, will retry…');
       setTimeout(init, 1000);
       return;
     }
 
-    console.log(LOG_PREFIX, 'Initializing...');
+    console.log(LOG, 'Monaco found, initializing…');
 
-    // Register the global completion provider
-    registerCompletions();
+    // 1. Register completion provider
+    var ok = registerProvider();
+    if (!ok) {
+      console.error(LOG, 'Failed to register any completion provider');
+      return;
+    }
 
-    // Configure existing editors
-    const editors = findAllEditors();
+    // 2. Configure existing editors
+    var editors = getEditors();
     editors.forEach(configureEditor);
-    console.log(LOG_PREFIX, `Found and configured ${editors.length} existing editor(s)`);
+    console.log(LOG, 'Configured', editors.length, 'existing editor(s)');
 
-    // Watch for new editors (APEX creates them dynamically)
-    if (window.monaco.editor.onDidCreateEditor) {
-      window.monaco.editor.onDidCreateEditor(function (editor) {
-        console.log(LOG_PREFIX, 'New editor created, configuring...');
-        configureEditor(editor);
+    // 3. Watch for new editors
+    if (typeof monaco.editor.onDidCreateEditor === 'function') {
+      monaco.editor.onDidCreateEditor(function (editor) {
+        console.log(LOG, 'New editor detected');
+        setTimeout(function () { configureEditor(editor); }, 200);
       });
     }
 
-    // Also observe DOM for dynamically added editors
-    const observer = new MutationObserver(function (mutations) {
-      let hasNewEditor = false;
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (
-            node.nodeType === 1 &&
-            (node.classList?.contains('monaco-editor') ||
-              node.querySelector?.('.monaco-editor'))
-          ) {
-            hasNewEditor = true;
+    // 4. DOM observer for dynamically added editors (APEX navigation)
+    var observer = new MutationObserver(function (mutations) {
+      var found = false;
+      for (var i = 0; i < mutations.length && !found; i++) {
+        var added = mutations[i].addedNodes;
+        for (var j = 0; j < added.length; j++) {
+          var node = added[j];
+          if (node.nodeType === 1 &&
+              (node.classList && node.classList.contains('monaco-editor') ||
+               node.querySelector && node.querySelector('.monaco-editor'))) {
+            found = true;
             break;
           }
         }
-        if (hasNewEditor) break;
       }
-
-      if (hasNewEditor) {
-        // Delay slightly to let APEX finish initializing the editor
+      if (found) {
         setTimeout(function () {
-          const editors = findAllEditors();
-          editors.forEach(configureEditor);
+          getEditors().forEach(configureEditor);
         }, 500);
       }
     });
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+    observer.observe(document.body, { childList: true, subtree: true });
 
-    // Status indicator
-    console.log(
-      LOG_PREFIX,
-      '✓ Active — SQL/PL/SQL/APEX API autocomplete enabled'
-    );
+    console.log(LOG, '✓ Active — SQL / PL/SQL / APEX API autocomplete enabled');
   }
 
-  // Start
   init();
 })();
