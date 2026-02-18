@@ -11,11 +11,7 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*/*/apex/*",
-        "*://*/*/ords/*",
-        "*://apex.oracle.com/*",
-        "http://localhost/*",
-        "https://localhost/*"
+        "<all_urls>"
       ],
       "js": [
         "content-script.js"
@@ -34,11 +30,7 @@
         "dictionaries/apex-api.json"
       ],
       "matches": [
-        "*://*/*/apex/*",
-        "*://*/*/ords/*",
-        "*://apex.oracle.com/*",
-        "http://localhost/*",
-        "https://localhost/*"
+        "<all_urls>"
       ]
     }
   ]
