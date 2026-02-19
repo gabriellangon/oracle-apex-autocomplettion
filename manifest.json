@@ -35,6 +35,8 @@
         "dict-loader.js",
         "monaco-poller.js",
         "language-switcher.js",
+        "plsql-indenter.js",
+        "formatter.js",
         "parsers/variable-parser.js",
         "dictionaries/sql-keywords.json",
         "dictionaries/plsql-keywords.json",

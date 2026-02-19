@@ -67,6 +67,10 @@
       // Step 4: Inject language switcher (for popup communication)
       await injectScript('language-switcher.js');
 
+      // Step 5: Inject PL/SQL indenter then formatter (order matters)
+      await injectScript('plsql-indenter.js');
+      await injectScript('formatter.js');
+
       console.log('[APEX Autocomplete] All scripts injected');
     } catch (err) {
       console.error('[APEX Autocomplete] Injection failed:', err);
