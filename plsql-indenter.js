@@ -125,6 +125,12 @@
     // Normalize line endings
     code = code.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
+    // Expand common inline closing clauses to their own lines.
+    // Example: "RETURN; END IF;" => "RETURN;\nEND IF;"
+    // This keeps END/END IF/END CASE aligned with their opening block.
+    code = code.replace(/;\s*(END\s+(IF|LOOP|CASE)\s*;)/gi, ';\n$1');
+    code = code.replace(/;\s*(END\s*;)/gi, ';\n$1');
+
     // Get stripped version for keyword analysis
     var stripped = stripNonCode(code);
 
