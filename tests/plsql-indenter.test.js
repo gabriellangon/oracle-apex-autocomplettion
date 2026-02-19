@@ -380,7 +380,46 @@ describe('plsql-indenter.js', () => {
     });
   });
 
-  // ── Uppercase keywords option ────────────────
+
+    test('indents CASE expression with END; without breaking following lines', () => {
+      var code = [
+        'BEGIN',
+        'x := CASE',
+        'WHEN a = 1 THEN',
+        "'A'",
+        'WHEN a = 2 THEN',
+        "'B'",
+        'END;',
+        'y := 42;',
+        'END;'
+      ].join('\n');
+      var result = format(code);
+      var lines = result.trim().split('\n');
+      expect(lines[1]).toMatch(/^\s{2}x := CASE/);
+      expect(lines[2]).toMatch(/^\s{4}WHEN/);
+      expect(lines[3]).toMatch(/^\s{6}'A'/);
+      expect(lines[4]).toMatch(/^\s{4}WHEN/);
+      expect(lines[6]).toMatch(/^\s{2}END;/);
+      expect(lines[7]).toMatch(/^\s{2}y := 42;/);
+      expect(lines[8]).toBe('END;');
+    });
+
+    test('indents multiline function call parameters one level deeper than call name', () => {
+      var code = [
+        'BEGIN',
+        'apex_theme.SET_USER_STYLE (',
+        'p_id => l_style_id',
+        ');',
+        'END;'
+      ].join('\n');
+      var result = format(code);
+      var lines = result.trim().split('\n');
+      expect(lines[1]).toMatch(/^\s{2}apex_theme.SET_USER_STYLE \($/);
+      expect(lines[2]).toMatch(/^\s{4}p_id => l_style_id$/);
+      expect(lines[3]).toMatch(/^\s{2}\);$/);
+    });
+
+    // ── Uppercase keywords option ────────────────
 
   describe('keyword casing', () => {
     test('uppercases keywords by default', () => {

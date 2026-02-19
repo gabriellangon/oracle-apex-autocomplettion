@@ -134,6 +134,8 @@
 
     var result = [];
     var level = 0;
+    var inWhenThenBranch = false;
+    var parenCallDepth = 0;
 
     // Keywords that increase indent (next line)
     // We match against the stripped (no comments/strings) version
@@ -176,9 +178,21 @@
       var dedentBefore = 0;
       var indentAfter = 0;
 
+      var isEndLine = reEnd.test(trimmedStripped) || reEndLabel.test(trimmedStripped);
+      var isWhenThenLine = reWhenException.test(trimmedStripped) && reThen.test(trimmedStripped);
+      var isElseLine = reElse.test(trimmedStripped);
+      var isCloseParenLine = /^\s*\)\s*;?\s*$/i.test(trimmedStripped);
+
+      // If we are inside a WHEN ... THEN branch body and hit a sibling/closing
+      // clause, first dedent to the WHEN level.
+      if (inWhenThenBranch && (isWhenThenLine || isElseLine || isEndLine)) {
+        dedentBefore += 1;
+        inWhenThenBranch = false;
+      }
+
       // END ... ;
-      if (reEnd.test(trimmedStripped) || reEndLabel.test(trimmedStripped)) {
-        dedentBefore = 1;
+      if (isEndLine) {
+        dedentBefore += 1;
       }
       // BEGIN after DECLARE — should be at the same level as DECLARE
       else if (reBegin.test(trimmedStripped)) {
@@ -208,9 +222,12 @@
       // Apply dedent
       level = Math.max(0, level - dedentBefore);
 
+      // Continuation indentation for multiline procedure/function call arguments.
+      var continuationIndent = (parenCallDepth > 0 && !isCloseParenLine) ? 1 : 0;
+
       // Build the indented line
       var indentStr = '';
-      for (var il = 0; il < level; il++) indentStr += indent;
+      for (var il = 0; il < (level + continuationIndent); il++) indentStr += indent;
 
       // Optionally uppercase keywords in the code portion
       var outputLine = trimmedOrig;
@@ -262,15 +279,30 @@
         indentAfter = 1;
       }
       // WHEN ... THEN (in exception or case)
-      else if (reWhenException.test(trimmedStripped) && reThen.test(trimmedStripped)) {
+      else if (isWhenThenLine) {
         indentAfter = 1;
       }
       // CASE (standalone)
       else if (reCaseStart.test(trimmedStripped) && !reEnd.test(trimmedStripped)) {
         indentAfter = 1;
       }
+      // CASE used in assignment/expression form: x := CASE
+      else if (/\bCASE\b/i.test(trimmedStripped) && !/\bEND\b/i.test(trimmedStripped)) {
+        indentAfter = 1;
+      }
 
       level += indentAfter;
+
+      if (isWhenThenLine) {
+        inWhenThenBranch = true;
+      }
+
+      if (/\(\s*$/i.test(trimmedStripped) && !isCloseParenLine) {
+        parenCallDepth += 1;
+      }
+      if (isCloseParenLine && parenCallDepth > 0) {
+        parenCallDepth -= 1;
+      }
     }
 
     // Remove trailing empty lines
