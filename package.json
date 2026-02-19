@@ -1,0 +1,14 @@
+{
+  "name": "apex-monaco-autocomplete",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Adds SQL, PL/SQL, and APEX API autocomplete to Oracle APEX Monaco editors",
+  "scripts": {
+    "test": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  }
+}
