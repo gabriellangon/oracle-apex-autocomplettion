@@ -1,6 +1,6 @@
 # Contributing to APEX Autocomplete
 
-First off, thank you for considering contributing to APEX Autocomplete! It's people like you that make this extension better for everyone.
+First off, thank you for considering contributing to Oracle APEX Autocomplete! It's people like you that make this extension better for everyone.
 
 ## Code of Conduct
 
@@ -74,7 +74,7 @@ Feature requests are welcome! Please provide:
 ```bash
 # Clone your fork
 git clone https://github.com/YOUR_USERNAME/apex-autocomplete.git
-cd apex-autocomplete
+cd oracle-apex-autocomplete
 
 # Install dependencies
 npm install
@@ -96,7 +96,7 @@ npm run test:watch
 ### Project Structure
 
 ```
-apex-autocomplete/
+oracle-apex-autocomplete/
 ├── manifest.json           # Extension manifest
 ├── content-script.js       # Bridge between extension and page
 ├── injected.js            # Main logic injected into APEX pages

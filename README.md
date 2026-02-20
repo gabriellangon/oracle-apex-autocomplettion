@@ -1,10 +1,10 @@
-# APEX Autocomplete - SQL/PL/SQL IntelliSense
+# APEX Autocomplete
 
-[![Tests](https://github.com/gabriellangon/apex-autocomplete/actions/workflows/test.yml/badge.svg)](https://github.com/gabriellangon/apex-autocomplete/actions/workflows/test.yml)
+[![Tests](https://github.com/gabriellangon/oracle-oracle-apex-autocomplete/actions/workflows/test.yml/badge.svg)](https://github.com/gabriellangon/oracle-oracle-apex-autocomplete/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome-Extension-green.svg)](https://chrome.google.com/webstore)
 
-> Powerful SQL, PL/SQL, and Oracle APEX API autocomplete for Oracle APEX Monaco editors.
+> SQL, PL/SQL, and Oracle APEX API autocomplete for Oracle APEX code editors.
 
 ![APEX Autocomplete Demo](docs/demo.gif)
 
@@ -32,8 +32,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/gabriellangon/apex-autocomplete.git
-cd apex-autocomplete
+git clone https://github.com/gabriellangon/oracle-apex-autocomplete.git
+cd oracle-apex-autocomplete
 
 # Install dependencies
 npm install
@@ -58,7 +58,7 @@ Then load the extension in Chrome:
 ## Project Structure
 
 ```
-apex-autocomplete/
+oracle-apex-autocomplete/
 ├── extension/              # Chrome extension source code
 │   ├── manifest.json
 │   ├── content-script.js
@@ -97,7 +97,7 @@ npm run test:watch  # Watch mode
 
 ```bash
 cd extension
-zip -r ../apex-autocomplete.zip . -x "*.DS_Store"
+zip -r ../oracle-apex-autocomplete.zip . -x "*.DS_Store"
 ```
 
 ## Contributing
@@ -116,7 +116,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Support
 
-- **Bug Reports**: [GitHub Issues](https://github.com/gabriellangon/apex-autocomplete/issues)
+- **Bug Reports**: [GitHub Issues](https://github.com/gabriellangon/oracle-oracle-apex-autocomplete/issues)
 - **Questions**: Open an issue with the `question` label
 
 ---

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "APEX Autocomplete - SQL/PL/SQL IntelliSense",
+  "name": "APEX Autocomplete",
   "version": "1.1.0",
-  "description": "SQL, PL/SQL and Oracle APEX API autocomplete for Oracle APEX editors. Smart code completion, formatting, and language switching.",
+  "description": "SQL, PL/SQL and Oracle APEX API autocomplete for Oracle APEX code editors.",
   "permissions": [],
   "action": {
     "default_popup": "popup.html",
