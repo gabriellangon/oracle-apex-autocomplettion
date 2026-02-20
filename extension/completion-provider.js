@@ -156,7 +156,9 @@
   function createCompletionProvider(monaco) {
     var sqlItems    = buildKeywordItems(monaco, window.__sqlKeywords);
     var plsqlItems  = buildKeywordItems(monaco, window.__plsqlKeywords);
-    var snippets    = buildSnippetItems(monaco, window.__plsqlKeywords);
+    var sqlSnippets = buildSnippetItems(monaco, window.__sqlKeywords);
+    var plsqlSnips  = buildSnippetItems(monaco, window.__plsqlKeywords);
+    var snippets    = sqlSnippets.concat(plsqlSnips);
     var apexItems   = buildApexItems(monaco, window.__apexApi);
     var staticItems = sqlItems.concat(plsqlItems).concat(snippets).concat(apexItems);
     var packageMap  = buildPackageMap(monaco, window.__apexApi);

@@ -97,5 +97,32 @@
     { "label": "DUAL", "category": "function", "detail": "Dummy table" },
     { "label": "NEXTVAL", "category": "function", "detail": "Next sequence value" },
     { "label": "CURRVAL", "category": "function", "detail": "Current sequence value" }
+  ],
+  "snippets": [
+    {
+      "label": "SELECT..FROM..WHERE",
+      "insertText": "SELECT ${1:columns}\nFROM ${2:table}\nWHERE ${3:condition};",
+      "detail": "Basic SELECT query"
+    },
+    {
+      "label": "SELECT..INTO (PL/SQL)",
+      "insertText": "SELECT ${1:column}\nINTO ${2:variable}\nFROM ${3:table}\nWHERE ${4:condition};",
+      "detail": "Single-row SELECT INTO"
+    },
+    {
+      "label": "INSERT..VALUES",
+      "insertText": "INSERT INTO ${1:table} (${2:columns})\nVALUES (${3:values});",
+      "detail": "Insert statement skeleton"
+    },
+    {
+      "label": "UPDATE..SET..WHERE",
+      "insertText": "UPDATE ${1:table}\nSET ${2:column} = ${3:value}\nWHERE ${4:condition};",
+      "detail": "Update statement skeleton"
+    },
+    {
+      "label": "DELETE..WHERE",
+      "insertText": "DELETE FROM ${1:table}\nWHERE ${2:condition};",
+      "detail": "Delete statement skeleton"
+    }
   ]
 }

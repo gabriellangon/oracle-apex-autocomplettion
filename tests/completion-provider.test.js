@@ -15,6 +15,13 @@ beforeEach(() => {
         keywords: [
           { label: 'SELECT', category: 'dml', detail: 'Retrieve data' },
           { label: 'INSERT', category: 'dml', detail: 'Insert rows' }
+        ],
+        snippets: [
+          {
+            label: 'SELECT..FROM..WHERE',
+            detail: 'Basic SELECT query',
+            insertText: 'SELECT ${1:columns} FROM ${2:table} WHERE ${3:condition};'
+          }
         ]
       },
       __plsqlKeywords: {
@@ -100,6 +107,18 @@ describe('completion-provider', () => {
     expect(labels).toContain('BEGIN');
   });
 
+
+  test('returns SQL snippets in suggestions', () => {
+    const provider = createCompletionProvider(monaco);
+    const editor = createMockEditor({ content: '' });
+    const model = editor.getModel();
+    const position = { lineNumber: 1, column: 1 };
+
+    const result = provider.provideCompletionItems(model, position);
+    const labels = result.suggestions.map(s => s.label);
+    expect(labels).toContain('SELECT..FROM..WHERE');
+  });
+
   test('returns snippets in suggestions', () => {
     const provider = createCompletionProvider(monaco);
     const editor = createMockEditor({ content: '' });
@@ -111,7 +130,8 @@ describe('completion-provider', () => {
       s => s.kind === monaco.languages.CompletionItemKind.Snippet
     );
     expect(snippetItems.length).toBeGreaterThan(0);
-    expect(snippetItems[0].label).toBe('IF-THEN-ELSE');
+    const snippetLabels = snippetItems.map(s => s.label);
+    expect(snippetLabels).toContain('IF-THEN-ELSE');
   });
 
   test('returns APEX API packages in suggestions', () => {
