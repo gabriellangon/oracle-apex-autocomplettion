@@ -462,9 +462,9 @@ describe('plsql-indenter.js', () => {
     ].join('\n');
     var result = format(code);
     var lines = result.trim().split('\n');
+    // With trailing close style, the closing paren joins the last parameter line
     expect(lines[1]).toMatch(/^\s{2}apex_theme.SET_USER_STYLE \($/);
-    expect(lines[2]).toMatch(/^\s{4}p_id => l_style_id$/);
-    expect(lines[3]).toMatch(/^\s{2}\);$/);
+    expect(lines[2]).toMatch(/p_id => l_style_id\);$/);
   });
 
 
@@ -480,11 +480,10 @@ describe('plsql-indenter.js', () => {
     ].join('\n');
     var result = format(code);
     var lines = result.trim().split('\n');
+    // With trailing close style, closing parens join the last content line
     expect(lines[1]).toMatch(/^\s{2}owa_util.redirect_url\($/);
-    expect(lines[2]).toMatch(/^\s{4}apex_page.get_url \($/);
-    expect(lines[3]).toMatch(/^\s{6}p_page => :app_page_id$/);
-    expect(lines[4]).toMatch(/^\s{4}\)$/);
-    expect(lines[5]).toMatch(/^\s{2}\);$/);
+    expect(lines[2]).toMatch(/apex_page.get_url \($/);
+    expect(lines[3]).toMatch(/p_page => :app_page_id\)\);$/);
   });
 
   // ── Inline THEN body splitting ─────────────────

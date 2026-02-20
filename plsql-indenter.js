@@ -686,7 +686,43 @@
       }
     }
 
-    return result.join('\n') + '\n';
+    // ── Post-processing: trailing closing parentheses ──
+    //
+    // Join lines that contain only closing parentheses (with optional semicolon)
+    // to the end of the previous non-empty content line.
+    // Example:
+    //   regexp_replace(..., '\1'
+    //   )
+    //   );
+    // Becomes:
+    //   regexp_replace(..., '\1'));
+    //
+    var finalResult = [];
+    for (var tr = 0; tr < result.length; tr++) {
+      var trLine = result[tr];
+      var trTrimmed = trLine.trim();
+
+      // Check if line is only closing parens (with optional semicolon and spaces)
+      // e.g., ")", ");", "))", "));", etc.
+      if (/^[\)\s;]+$/.test(trTrimmed) && trTrimmed.length > 0) {
+        // Find the last non-empty line in finalResult to append to
+        var appended = false;
+        for (var back = finalResult.length - 1; back >= 0; back--) {
+          if (finalResult[back].trim()) {
+            finalResult[back] = finalResult[back] + trTrimmed;
+            appended = true;
+            break;
+          }
+        }
+        if (!appended) {
+          finalResult.push(trLine);
+        }
+      } else {
+        finalResult.push(trLine);
+      }
+    }
+
+    return finalResult.join('\n') + '\n';
   }
 
   /**
