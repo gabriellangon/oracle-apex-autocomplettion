@@ -163,12 +163,6 @@
     var staticItems = sqlItems.concat(plsqlItems).concat(snippets).concat(apexItems);
     var packageMap  = buildPackageMap(monaco, window.__apexApi);
 
-    console.log('[APEX Autocomplete] Provider built:',
-      sqlItems.length, 'SQL +',
-      plsqlItems.length, 'PL/SQL +',
-      snippets.length, 'snippets +',
-      apexItems.length, 'APEX API =',
-      staticItems.length, 'total items');
 
     return {
       triggerCharacters: ['.'],
@@ -205,5 +199,4 @@
   // Expose to injected.js
   window.__createCompletionProvider = createCompletionProvider;
 
-  console.log('[APEX Autocomplete] completion-provider.js loaded');
 })();

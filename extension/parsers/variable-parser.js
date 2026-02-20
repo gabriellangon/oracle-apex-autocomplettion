@@ -97,5 +97,4 @@
 
   window.__extractVariables = extractVariables;
 
-  console.log('[APEX Autocomplete] variable-parser.js loaded');
 })();

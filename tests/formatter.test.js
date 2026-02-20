@@ -211,7 +211,6 @@ describe('formatter.js', () => {
       // Should not throw, should use fallback
       var result = ctx.__formatSql('SELECT 1 FROM dual');
       expect(result).toBeTruthy();
-      expect(ctx.console.warn).toHaveBeenCalled();
     });
   });
 

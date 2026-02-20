@@ -780,7 +780,4 @@
     window.__tokenizePlsql = tokenize;
   }
 
-  if (typeof window !== 'undefined' && window.console) {
-    console.log('[APEX Autocomplete] plsql-indenter.js loaded');
-  }
 })();

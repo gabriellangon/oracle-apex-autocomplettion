@@ -105,7 +105,6 @@
           linesBetweenQueries: 1
         });
       } catch (e) {
-        console.warn(LOG, 'sql-formatter error, using fallback:', e.message);
         return formatSqlFallback(code, tabSize, upperCase);
       }
     }
@@ -228,23 +227,17 @@
     if (!code || !code.trim()) return code || '';
 
     var lang = detectLanguageType(code);
-    console.log(LOG, '🔍 detectLanguageType =>', lang);
-    console.log(LOG, '📝 Code preview (first 200 chars):', code.substring(0, 200));
 
     if (lang === 'plsql') {
       // Use custom PL/SQL indenter
       if (typeof window.__formatPlsql === 'function') {
-        console.log(LOG, '✅ Using PL/SQL indenter (window.__formatPlsql)');
         var result = window.__formatPlsql(code, options);
-        console.log(LOG, '📤 Formatted result preview:', result.substring(0, 200));
         return result;
       }
       // Fallback if indenter not loaded
-      console.warn(LOG, '⚠️ PL/SQL indenter NOT loaded (window.__formatPlsql is', typeof window.__formatPlsql, '), using SQL formatter fallback');
       return formatSql(code, options);
     }
 
-    console.log(LOG, '✅ Using SQL formatter');
     return formatSql(code, options);
   }
 
@@ -256,48 +249,22 @@
    */
   function registerFormattingProvider() {
     if (!window.monaco || !window.monaco.languages) {
-      console.warn(LOG, 'Monaco not available for formatting provider');
       return false;
     }
 
     var provider = {
       provideDocumentFormattingEdits: function (model, options) {
-        console.log(LOG, '🚀 provideDocumentFormattingEdits TRIGGERED');
-        console.log(LOG, '📋 Model language:', model.getLanguageId ? model.getLanguageId() : 'unknown');
         var code = model.getValue();
         var tabSize = (options && options.tabSize) || 2;
-        console.log(LOG, '⚙️ Options: tabSize=' + tabSize, ', code length=' + code.length);
 
         var formatted = formatCode(code, {
           tabSize: tabSize,
           upperCaseKeywords: true
         });
 
-        // Diagnostic: did the code actually change?
-        var changed = (formatted !== code);
-        console.log(LOG, '🔄 Code changed?', changed);
-        if (!changed) {
-          console.warn(LOG, '⚠️ FORMATTED === INPUT — nothing will change!');
-        } else {
-          // Show first difference
-          var inLines = code.split('\n');
-          var outLines = formatted.split('\n');
-          for (var d = 0; d < Math.max(inLines.length, outLines.length); d++) {
-            if (inLines[d] !== outLines[d]) {
-              console.log(LOG, '📌 First diff at line', d + 1);
-              console.log(LOG, '  IN:  |' + (inLines[d] || '') + '|');
-              console.log(LOG, '  OUT: |' + (outLines[d] || '') + '|');
-              break;
-            }
-          }
-        }
-
         // Return a single edit that replaces the entire document
         var lineCount = model.getLineCount();
         var lastLineLength = model.getLineMaxColumn(lineCount);
-
-        console.log(LOG, '📐 Edit range: lines 1-' + lineCount + ', lastCol=' + lastLineLength);
-        console.log(LOG, '📏 Formatted length:', formatted.length, 'vs input length:', code.length);
 
         return [{
           range: {
@@ -322,16 +289,11 @@
             monaco.languages.registerDocumentFormattingEditProvider(lang, provider);
             registered.push(lang);
           } catch (e) {
-            console.debug(LOG, 'Skip formatting for "' + lang + '":', e.message);
           }
         }
       });
     } catch (e) {
       console.error(LOG, 'Failed to register formatting provider:', e.message);
-    }
-
-    if (registered.length > 0) {
-      console.log(LOG, 'Formatting registered for:', registered.join(', '));
     }
 
     return registered.length > 0;
@@ -384,10 +346,7 @@
 
   function init() {
     if (!window.monaco) {
-      if (!hasLoggedMonacoWait) {
-        console.warn(LOG, 'Monaco not found, will retry…');
-        hasLoggedMonacoWait = true;
-      }
+      hasLoggedMonacoWait = true;
       setTimeout(init, 1000);
       return;
     }
@@ -400,10 +359,8 @@
 
     // Register formatting provider
     var ok = registerFormattingProvider();
-    if (ok) {
-      // console.log(LOG, '✅ Formatting provider registered (Shift+Alt+F)');
-    } else {
-      console.warn(LOG, '❌ Formatting provider NOT registered');
+    if (!ok) {
+      console.error(LOG, 'Formatting provider was not registered');
     }
 
     // Try to add format button to toolbar
@@ -415,7 +372,6 @@
       });
       observer.observe(document.body, { childList: true, subtree: true });
     } catch (e) {
-      console.debug(LOG, 'Could not add format button:', e.message);
     }
 
     // console.log(LOG, 'Formatter active');

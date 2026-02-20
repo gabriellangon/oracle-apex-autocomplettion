@@ -91,5 +91,4 @@
         }));
     });
 
-    console.log('[APEX Autocomplete] language-switcher.js loaded');
 })();

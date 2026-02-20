@@ -68,11 +68,9 @@
 
   function registerProvider() {
     if (!window.monaco || !window.monaco.languages) {
-      console.warn(LOG, 'Monaco not available');
       return false;
     }
     if (!window.__createCompletionProvider) {
-      console.warn(LOG, 'Completion provider not loaded');
       return false;
     }
 
@@ -109,9 +107,7 @@
           disposables.push(d);
           count++;
           // console.log(LOG, 'Registered for "' + lang + '"');
-        } catch (e) {
-          console.debug(LOG, 'Skip "' + lang + '":', e.message);
-        }
+        } catch (e) {}
       }
     });
 
@@ -195,7 +191,7 @@
       });
       // console.log(LOG, 'Configured editor');
     } catch (e) {
-      console.debug(LOG, 'Configure error:', e.message);
+      // Ignore editor option update failures.
     }
   }
 
@@ -203,10 +199,7 @@
 
   function init() {
     if (!window.monaco) {
-      if (!hasLoggedMonacoWait) {
-        console.warn(LOG, 'Monaco not found, will retry…');
-        hasLoggedMonacoWait = true;
-      }
+      hasLoggedMonacoWait = true;
       setTimeout(init, 1000);
       return;
     }
