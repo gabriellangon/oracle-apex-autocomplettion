@@ -80,7 +80,7 @@ describe('content-script', () => {
   }
 
   function loadContentScript(context) {
-    const filePath = path.resolve(__dirname, '..', 'content-script.js');
+    const filePath = path.resolve(__dirname, '..', 'extension', 'content-script.js');
     const code = fs.readFileSync(filePath, 'utf8');
     const sandbox = vm.createContext(context);
     vm.runInContext(code, sandbox, { filename: 'content-script.js' });

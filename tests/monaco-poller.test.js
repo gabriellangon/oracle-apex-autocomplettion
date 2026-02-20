@@ -34,7 +34,7 @@ describe('monaco-poller', () => {
     const fs = require('fs');
     const path = require('path');
     const vm = require('vm');
-    const code = fs.readFileSync(path.resolve(__dirname, '..', 'monaco-poller.js'), 'utf8');
+    const code = fs.readFileSync(path.resolve(__dirname, '..', 'extension', 'monaco-poller.js'), 'utf8');
     const sandbox = vm.createContext(ctx);
     vm.runInContext(code, sandbox, { filename: 'monaco-poller.js' });
   }

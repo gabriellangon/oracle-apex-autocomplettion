@@ -31,7 +31,7 @@ function loadSwitcher(monaco, mockDoc) {
   ctx.monaco = monaco;
 
   const code = fs.readFileSync(
-    path.resolve(__dirname, '..', 'language-switcher.js'), 'utf8'
+    path.resolve(__dirname, '..', 'extension', 'language-switcher.js'), 'utf8'
   );
   const sandbox = vm.createContext(ctx);
   vm.runInContext(code, sandbox, { filename: 'language-switcher.js' });
@@ -74,7 +74,7 @@ describe('language-switcher', () => {
     // No monaco set
 
     const code = fs.readFileSync(
-      path.resolve(__dirname, '..', 'language-switcher.js'), 'utf8'
+      path.resolve(__dirname, '..', 'extension', 'language-switcher.js'), 'utf8'
     );
     vm.runInContext(code, vm.createContext(ctx), { filename: 'language-switcher.js' });
 

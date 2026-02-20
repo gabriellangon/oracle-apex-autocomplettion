@@ -45,7 +45,7 @@ describe('popup.js', () => {
     ctx.Array = Array;
     ctx.JSON = JSON;
 
-    const code = fs.readFileSync(path.resolve(__dirname, '..', 'popup.js'), 'utf8');
+    const code = fs.readFileSync(path.resolve(__dirname, '..', 'extension', 'popup.js'), 'utf8');
     const sandbox = vm.createContext(ctx);
     vm.runInContext(code, sandbox, { filename: 'popup.js' });
     return ctx;
@@ -76,7 +76,7 @@ describe('popup.js', () => {
     ctx.Array = Array;
     ctx.JSON = JSON;
 
-    const code = fs.readFileSync(path.resolve(__dirname, '..', 'popup.js'), 'utf8');
+    const code = fs.readFileSync(path.resolve(__dirname, '..', 'extension', 'popup.js'), 'utf8');
     vm.runInContext(code, vm.createContext(ctx), { filename: 'popup.js' });
 
     const noEditors = document.getElementById('no-editors');
@@ -196,7 +196,7 @@ describe('popup.js', () => {
     ctx.Array = Array;
     ctx.JSON = JSON;
 
-    const code = fs.readFileSync(path.resolve(__dirname, '..', 'popup.js'), 'utf8');
+    const code = fs.readFileSync(path.resolve(__dirname, '..', 'extension', 'popup.js'), 'utf8');
     vm.runInContext(code, vm.createContext(ctx), { filename: 'popup.js' });
 
     const noEditors = document.getElementById('no-editors');

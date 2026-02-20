@@ -1,18 +1,20 @@
 {
   "manifest_version": 3,
-  "name": "APEX Monaco Autocomplete",
+  "name": "APEX Autocomplete - SQL/PL/SQL IntelliSense",
   "version": "1.1.0",
-  "description": "Adds SQL, PL/SQL, and APEX API autocomplete to Oracle APEX Monaco editors, with language switching",
+  "description": "SQL, PL/SQL and Oracle APEX API autocomplete for Oracle APEX editors. Smart code completion, formatting, and language switching.",
   "permissions": [],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
+      "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",
       "128": "icons/icon-128.png"
     },
-    "default_title": "APEX Autocomplete — Language Switcher"
+    "default_title": "APEX Autocomplete - Language Switcher"
   },
   "icons": {
+    "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
   },

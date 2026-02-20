@@ -135,7 +135,8 @@ function loadScript(filePath, context) {
   if (!context.JSON) context.JSON = JSON;
   if (!context.Array) context.Array = Array;
 
-  var absolutePath = path.resolve(__dirname, '..', filePath);
+  // Files are now in extension/ subdirectory
+  var absolutePath = path.resolve(__dirname, '..', 'extension', filePath);
   var code = fs.readFileSync(absolutePath, 'utf8');
 
   var sandbox = vm.createContext(context);
