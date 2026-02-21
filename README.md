@@ -72,10 +72,10 @@ oracle-apex-autocomplete/
 │   ├── dictionaries/      # API dictionaries (generated)
 │   └── icons/
 ├── scripts/                # API dictionary generation tools
-│   ├── README.md          # Detailed generation instructions
-│   ├── query.sql          # Oracle SQL to extract APEX APIs
-│   ├── apex-public-plsql-api.json  # Public API whitelist
-│   └── generate_apex_api.py        # CSV → JSON converter
+│   ├── README.md
+│   ├── query.sql
+│   ├── apex-public-plsql-api.json
+│   └── generate_apex_api.py
 ├── tests/                  # Jest test suite
 ├── docs/                   # Documentation
 ├── README.md
