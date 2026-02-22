@@ -11,9 +11,9 @@ This folder contains the tools to generate the APEX PL/SQL API dictionary used f
 
 | File | Description |
 |------|-------------|
-| `query.sql` | Oracle SQL query to extract all APEX package procedures/functions with their signatures |
-| `apex-public-plsql-api.json` | List of public APEX API packages (from official Oracle documentation) |
-| `generate_apex_api.py` | Python script to convert CSV export to JSON dictionary |
+| `query.sql` | Oracle SQL query to extract all APEX packages, procedures, functions, return types, and arguments. |
+| `apex-public-plsql-api.json` | List of public APEX API packages (from official Oracle documentation). |
+| `generate_apex_api.py` | Python script to convert the CSV export into the JSON dictionary. |
 
 ## How to Update the Dictionary
 
@@ -26,30 +26,31 @@ Run `query.sql` in SQL Developer or SQL*Plus against an APEX schema:
 @query.sql
 ```
 
-Export the results as CSV with headers:
-- File: `apex-all-plsql-apis-args.csv`
-- Encoding: UTF-8
-- Delimiter: comma
+Export the results as a CSV with headers:
+- **File**: `apex-24.2-export.csv` (or appropriately named depending on your APEX version)
+- **Encoding**: UTF-8
+- **Delimiter**: comma
 
 ### Step 2: Generate the JSON Dictionary
 
 ```bash
 cd scripts
 
-# Edit generate_apex_api.py to set CSV_INPUT filename if needed
+# Update the CSV_INPUT filename inside generate_apex_api.py if necessary
 python3 generate_apex_api.py
 ```
 
 This will:
-1. Read the CSV export
-2. Filter only public APIs (listed in `apex-public-plsql-api.json`)
-3. Generate `extension/dictionaries/apex-api.json`
+1. Read the CSV export.
+2. Filter to keep only public APIs (allowed aliases listed in `apex-public-plsql-api.json`).
+3. Merge arguments from overloaded subprograms into a single rich signature.
+4. Generate `../extension/dictionaries/apex-api.json`.
 
 ### Step 3: Test
 
-1. Reload the extension in Chrome (`chrome://extensions`)
-2. Refresh your APEX page
-3. Test autocompletion
+1. Reload the extension in Chrome (`chrome://extensions`).
+2. Refresh your APEX page.
+3. Test the autocompletion (hover over or autocomplete to see the full signatures and return types).
 
 ## Output Format
 
@@ -59,8 +60,14 @@ The generated JSON follows this structure:
 {
   "packages": [
     {
-      "name": "APEX_UTIL",
+      "name": "APEX_ACL",
       "procedures": [
+        {
+          "label": "APEX_ACL.ADD_USER_ROLE",
+          "detail": "WWV_FLOW_ACL_API.ADD_USER_ROLE",
+          "kind": "procedure",
+          "signature": "APEX_ACL.ADD_USER_ROLE(p_user_name IN VARCHAR2, p_role_id IN NUMBER)"
+        },
         {
           "label": "APEX_UTIL.GET_SESSION_ID",
           "detail": "WWV_FLOW_UTILITIES.GET_SESSION_ID",
@@ -78,17 +85,18 @@ The generated JSON follows this structure:
 
 **Additive approach**: We keep all functions across APEX versions.
 
-- New functions are added when updating to a newer APEX version
-- Deprecated functions are NOT removed (they remain valid for older APEX instances)
-- This ensures compatibility with all APEX versions
+- New functions are added when updating to a newer APEX version.
+- Deprecated functions are NOT removed (they remain valid for older APEX instances).
+- This ensures compatibility with all APEX versions.
 
 ## Adding a New APEX Package
 
-1. Add the package name to `apex-public-plsql-api.json`
-2. Re-run the generation process
+1. Add the package name to `apex-public-plsql-api.json`.
+2. Re-run the generation process.
 
 ## Notes
 
-- The query distinguishes functions from procedures using `ALL_ARGUMENTS.POSITION = 0`
-- Functions have a `returnType` field and `RETURN` clause in their signature
-- Overloaded procedures are deduplicated (keeping unique parameter combinations)
+- The query distinguishes functions from procedures using `ALL_ARGUMENTS.POSITION = 0` (which implies a return type).
+- Functions include an additional `returnType` field, and a `RETURN` clause in their signature string.
+- Overloaded procedures/functions are merged into a single signature mapping. This shows all available parameters in the autocomplete snippet without duplicating autocomplete options.
+- The `detail` field contains the internal Oracle package name (e.g., `WWV_FLOW_UTILITIES`), while `label` contains the public synonym (e.g., `APEX_UTIL`).
