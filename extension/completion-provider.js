@@ -94,7 +94,7 @@
         var isFunc = proc.kind === 'function' ||
           (!proc.kind && proc.signature && proc.signature.indexOf('RETURN') !== -1);
         var kindDetail = isFunc
-          ? (proc.returnType ? 'function → ' + proc.returnType : 'function')
+          ? (proc.returnType ? ' → ' + proc.returnType : 'function')
           : 'procedure';
         var detail = kindDetail;
         // Format signature with line breaks for readability
@@ -102,9 +102,10 @@
         // Full documentation with alias info and signature
         var docParts = [];
 
-        docParts.push('*' + kindDetail + '*');
+        /*docParts.push('*' + kindDetail + '*' );*/
         if (formattedSig) docParts.push('```plsql\n' + formattedSig + '\n```');
-        if (proc.detail) docParts.push('alias for `' + proc.detail + '`');
+        docParts.push('\n\n');
+        /*if (proc.detail) docParts.push('alias for `' + proc.detail + '`');*/
         items.push({
           label:         proc.label,
           kind:          getKind(monaco, isFunc ? 'apex_func' : 'apex_proc'),
@@ -146,7 +147,7 @@
           (!proc.kind && proc.signature && proc.signature.indexOf('RETURN') !== -1);
 
         var kindDetail = isFunc
-          ? (proc.returnType ? 'function → ' + proc.returnType : 'function')
+          ? (proc.returnType ? ' → ' + proc.returnType : 'function')
           : 'procedure';
         var detail = kindDetail;
         // Format signature with line breaks for readability
@@ -154,9 +155,10 @@
         // Full documentation with alias info and signature
         var docParts = [];
 
-        docParts.push('*' + kindDetail + '*');
+        /*docParts.push('*' + kindDetail + '*' + 'ok');*/
         if (formattedSig) docParts.push('```plsql\n' + formattedSig + '\n```');
-        if (proc.detail) docParts.push('alias for `' + proc.detail + '`');
+        docParts.push('\n\n');
+        /*if (proc.detail) docParts.push('alias for `' + proc.detail + '`');*/
         return {
           label:         shortName,
           kind:          isFunc ? monaco.languages.CompletionItemKind.Function
