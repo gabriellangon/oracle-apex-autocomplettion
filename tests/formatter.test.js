@@ -249,6 +249,21 @@ describe('formatter.js', () => {
       expect(registeredLangs).toContain('sql');
     });
 
+    test('registers selection/range formatting provider when Monaco supports it', () => {
+      monaco.languages.registerDocumentRangeFormattingEditProvider = jest.fn(function () {
+        return { dispose: jest.fn() };
+      });
+
+      ctx.__apexFormatterActive = false;
+      loadScript('formatter.js', ctx);
+
+      expect(monaco.languages.registerDocumentRangeFormattingEditProvider).toHaveBeenCalled();
+      var calls = monaco.languages.registerDocumentRangeFormattingEditProvider.mock.calls;
+      var registeredLangs = calls.map(function (c) { return c[0]; });
+      expect(registeredLangs).toContain('plaintext');
+      expect(registeredLangs).toContain('sql');
+    });
+
     test('formatting provider returns full-document edit', () => {
       var calls = monaco.languages.registerDocumentFormattingEditProvider.mock.calls;
       // Get the provider that was registered
@@ -304,7 +319,6 @@ describe('formatter.js', () => {
       expect(monaco.languages.registerDocumentFormattingEditProvider.mock.calls.length).toBe(registerCallCount);
     });
   });
-
   // ── Edge cases ───────────────────────────────
 
   describe('edge cases', () => {

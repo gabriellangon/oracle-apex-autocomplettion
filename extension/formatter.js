@@ -278,6 +278,26 @@
       }
     };
 
+    var rangeProvider = {
+      provideDocumentRangeFormattingEdits: function (model, range, options) {
+        if (!model || !range || typeof model.getValueInRange !== 'function') {
+          return [];
+        }
+
+        var code = model.getValueInRange(range);
+        var tabSize = (options && options.tabSize) || 2;
+        var formatted = formatCode(code, {
+          tabSize: tabSize,
+          upperCaseKeywords: true
+        });
+
+        return [{
+          range: range,
+          text: formatted
+        }];
+      }
+    };
+
     // Register for all SQL-like languages
     var targets = ['plsql', 'sql', 'oracle', 'oraclesql', 'plaintext'];
     var registered = [];
@@ -287,6 +307,9 @@
         if (lang === 'plaintext' || langs.indexOf(lang) !== -1) {
           try {
             monaco.languages.registerDocumentFormattingEditProvider(lang, provider);
+            if (typeof monaco.languages.registerDocumentRangeFormattingEditProvider === 'function') {
+              monaco.languages.registerDocumentRangeFormattingEditProvider(lang, rangeProvider);
+            }
             registered.push(lang);
           } catch (e) {
           }
@@ -297,49 +320,6 @@
     }
 
     return registered.length > 0;
-  }
-
-  // ── Add format button to APEX toolbar ────────
-
-  function addFormatButton() {
-    // Look for the APEX code editor toolbar
-    var toolbars = document.querySelectorAll('.a-Toolbar, .a-CodeEditor-toolbar');
-    if (toolbars.length === 0) return;
-
-    toolbars.forEach(function (toolbar) {
-      // Don't add button twice
-      if (toolbar.querySelector('.apex-format-btn')) return;
-
-      var btn = document.createElement('button');
-      btn.className = 'a-Button a-Button--noLabel a-Button--withIcon apex-format-btn';
-      btn.title = 'Format SQL/PL/SQL (Shift+Alt+F)';
-      btn.type = 'button';
-      btn.innerHTML = '<span class="a-Icon fa fa-code" aria-hidden="true"></span>';
-      btn.style.cssText = 'margin-left:4px;';
-
-      btn.addEventListener('click', function () {
-        // Find the active/focused editor and trigger formatting
-        var editors = getActiveEditors();
-        if (editors.length > 0) {
-          var editor = editors[0];
-          // Trigger the built-in format action
-          editor.getAction('editor.action.formatDocument').run();
-        }
-      });
-
-      toolbar.appendChild(btn);
-    });
-  }
-
-  /**
-   * Get Monaco editors on the page.
-   */
-  function getActiveEditors() {
-    if (!window.monaco || !window.monaco.editor) return [];
-    if (typeof monaco.editor.getEditors === 'function') {
-      return monaco.editor.getEditors();
-    }
-    return [];
   }
 
   // ── Init ─────────────────────────────────────
@@ -361,17 +341,6 @@
     var ok = registerFormattingProvider();
     if (!ok) {
       console.error(LOG, 'Formatting provider was not registered');
-    }
-
-    // Try to add format button to toolbar
-    try {
-      addFormatButton();
-      // Also watch for toolbar being added later
-      var observer = new MutationObserver(function () {
-        addFormatButton();
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
-    } catch (e) {
     }
 
     // console.log(LOG, 'Formatter active');
