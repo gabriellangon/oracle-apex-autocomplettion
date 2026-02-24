@@ -44,12 +44,12 @@ beforeEach(() => {
             procedures: [
               {
                 label: 'APEX_JSON.OPEN_OBJECT',
-                detail: 'Opens a JSON object',
+                detail: 'WWV_FLOW_JSON',
                 signature: 'APEX_JSON.OPEN_OBJECT(p_name IN VARCHAR2 DEFAULT NULL)'
               },
               {
                 label: 'APEX_JSON.PARSE',
-                detail: 'Parse JSON string',
+                detail: 'WWV_FLOW_JSON',
                 signature: 'APEX_JSON.PARSE(p_source IN VARCHAR2) RETURN CLOB'
               }
             ]
@@ -134,6 +134,21 @@ describe('completion-provider', () => {
     expect(snippetLabels).toContain('IF-THEN-ELSE');
   });
 
+
+  test('shows only callable kind in top-level detail', () => {
+    const provider = createCompletionProvider(monaco);
+    const editor = createMockEditor({ content: '' });
+    const model = editor.getModel();
+    const position = { lineNumber: 1, column: 1 };
+
+    const result = provider.provideCompletionItems(model, position);
+    const openObj = result.suggestions.find(s => s.label === 'APEX_JSON.OPEN_OBJECT');
+    const parseFn = result.suggestions.find(s => s.label === 'APEX_JSON.PARSE');
+
+    expect(openObj.detail).toBe('procedure');
+    expect(parseFn.detail).toBe('function');
+  });
+
   test('returns APEX API packages in suggestions', () => {
     const provider = createCompletionProvider(monaco);
     const editor = createMockEditor({ content: '' });
@@ -185,6 +200,9 @@ describe('completion-provider', () => {
     const labels = result.suggestions.map(s => s.label);
     expect(labels).toContain('OPEN_OBJECT');
     expect(labels).toContain('PARSE');
+    const openObject = result.suggestions.find(s => s.label === 'OPEN_OBJECT');
+    expect(openObject.detail).toBe('procedure');
+    expect(openObject.documentation.value).toMatch(/alias for `WWV_FLOW_JSON`$/);
     // Should NOT contain top-level items
     expect(labels).not.toContain('SELECT');
   });

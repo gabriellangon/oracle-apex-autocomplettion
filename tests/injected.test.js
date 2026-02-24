@@ -93,6 +93,7 @@ describe('injected.js', () => {
     const opts = editor.updateOptions.mock.calls[0][0];
     expect(opts.quickSuggestions).toBeDefined();
     expect(opts.suggestOnTriggerCharacters).toBe(true);
+    expect(opts.fixedOverflowWidgets).toBe(true);
   });
 
   test('skips non-PL/SQL editors (JavaScript)', () => {

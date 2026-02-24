@@ -177,6 +177,10 @@
         quickSuggestions: { other: true, comments: false, strings: false },
         suggestOnTriggerCharacters: true,
         wordBasedSuggestions: true,
+        // Keep suggest/parameter widgets anchored to the editor viewport.
+        // This avoids offset tooltips in APEX layouts that use transformed
+        // containers (dialogs, split panes, sticky regions).
+        fixedOverflowWidgets: true,
         suggest: {
           showKeywords: true,
           showSnippets: true,
