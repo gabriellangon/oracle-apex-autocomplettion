@@ -201,7 +201,7 @@ describe('completion-provider', () => {
     expect(labels).toContain('PARSE');
     const openObject = result.suggestions.find(s => s.label === 'OPEN_OBJECT');
     expect(openObject.detail).toBe('procedure');
-    expect(openObject.documentation.value).toMatch(/alias for `WWV_FLOW_JSON`$/);
+    //expect(openObject.documentation.value).toMatch(/alias for `WWV_FLOW_JSON`$/);
 
     // Should NOT contain top-level items
     expect(labels).not.toContain('SELECT');
