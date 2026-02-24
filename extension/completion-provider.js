@@ -92,15 +92,18 @@
         // Use explicit 'kind' field if available, fallback to signature heuristic
         var isFunc = proc.kind === 'function' ||
           (!proc.kind && proc.signature && proc.signature.indexOf('RETURN') !== -1);
-        // Short detail: just show return type for functions, or "procedure"
-        var detail = isFunc
-          ? (proc.returnType ? '→ ' + proc.returnType : 'function')
+        // Keep functional description in first-level detail for readability
+        // and append procedure/function info.
+        var kindDetail = isFunc
+          ? (proc.returnType ? 'function → ' + proc.returnType : 'function')
           : 'procedure';
+        var detail = proc.detail ? proc.detail + ' • ' + kindDetail : kindDetail;
         // Format signature with line breaks for readability
         var formattedSig = formatSignature(proc.signature);
-        // Full documentation with internal name and signature
+        // Full documentation with summary and signature
         var docParts = [];
         if (proc.detail) docParts.push('**' + proc.detail + '**');
+        docParts.push('*' + kindDetail + '*');
         if (formattedSig) docParts.push('```plsql\n' + formattedSig + '\n```');
         items.push({
           label:         proc.label,
@@ -141,15 +144,18 @@
         // Use explicit 'kind' field if available, fallback to signature heuristic
         var isFunc = proc.kind === 'function' ||
           (!proc.kind && proc.signature && proc.signature.indexOf('RETURN') !== -1);
-        // Short detail: just show return type for functions, or "procedure"
-        var detail = isFunc
-          ? (proc.returnType ? '→ ' + proc.returnType : 'function')
+        // Keep functional description in first-level detail for readability
+        // and append procedure/function info.
+        var kindDetail = isFunc
+          ? (proc.returnType ? 'function → ' + proc.returnType : 'function')
           : 'procedure';
+        var detail = proc.detail ? proc.detail + ' • ' + kindDetail : kindDetail;
         // Format signature with line breaks for readability
         var formattedSig = formatSignature(proc.signature);
-        // Full documentation with internal name and signature
+        // Full documentation with summary and signature
         var docParts = [];
         if (proc.detail) docParts.push('**' + proc.detail + '**');
+        docParts.push('*' + kindDetail + '*');
         if (formattedSig) docParts.push('```plsql\n' + formattedSig + '\n```');
         return {
           label:         shortName,

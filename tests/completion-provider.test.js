@@ -134,6 +134,21 @@ describe('completion-provider', () => {
     expect(snippetLabels).toContain('IF-THEN-ELSE');
   });
 
+
+  test('keeps functional description in top-level detail and includes kind', () => {
+    const provider = createCompletionProvider(monaco);
+    const editor = createMockEditor({ content: '' });
+    const model = editor.getModel();
+    const position = { lineNumber: 1, column: 1 };
+
+    const result = provider.provideCompletionItems(model, position);
+    const openObj = result.suggestions.find(s => s.label === 'APEX_JSON.OPEN_OBJECT');
+    const parseFn = result.suggestions.find(s => s.label === 'APEX_JSON.PARSE');
+
+    expect(openObj.detail).toBe('Opens a JSON object • procedure');
+    expect(parseFn.detail).toBe('Parse JSON string • function');
+  });
+
   test('returns APEX API packages in suggestions', () => {
     const provider = createCompletionProvider(monaco);
     const editor = createMockEditor({ content: '' });
@@ -185,6 +200,8 @@ describe('completion-provider', () => {
     const labels = result.suggestions.map(s => s.label);
     expect(labels).toContain('OPEN_OBJECT');
     expect(labels).toContain('PARSE');
+    const openObject = result.suggestions.find(s => s.label === 'OPEN_OBJECT');
+    expect(openObject.detail).toBe('Opens a JSON object • procedure');
     // Should NOT contain top-level items
     expect(labels).not.toContain('SELECT');
   });
