@@ -12,19 +12,20 @@
 
 - **SQL Autocomplete** - Complete SQL keywords, clauses, and syntax as you type
 - **PL/SQL Autocomplete** - Smart completion for PL/SQL keywords, built-in functions, and procedural constructs
-- **Oracle APEX API Autocomplete** - Full support for 500+ APEX PL/SQL APIs:
+- **Oracle APEX API Autocomplete** - Full support for APEX publics PL/SQL APIs:
   - `APEX_UTIL`, `APEX_PAGE`, `APEX_APPLICATION`
   - `APEX_COLLECTION`, `APEX_MAIL`, `APEX_JSON`
   - `APEX_WEB_SERVICE`, `APEX_DEBUG`, and more...
 - **Smart Code Formatting** - Automatic PL/SQL indentation and formatting
 - **Language Switching** - Easily switch between SQL and PL/SQL modes
 - **Variable Detection** - Recognizes declared variables in your code
+- **Local Code Autocomplete** - Detects locally declared packages, procedures, and functions from the code you are currently editing, and adds them to top-level suggestions and package. member suggestions.
 
 ## Installation
 
 ### From Chrome Web Store (Recommended)
 
-1. Visit the [Chrome Web Store page](#) *(link coming soon)*
+1. Visit the [Chrome Web Store page](https://chromewebstore.google.com/detail/dhjgjlklipcpfeolnkoknmacncpdhfjj/preview?hl=fr)
 2. Click "Add to Chrome"
 3. Navigate to any Oracle APEX page with a code editor
 
