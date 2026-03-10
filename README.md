@@ -25,7 +25,7 @@
 
 ### From Chrome Web Store (Recommended)
 
-1. Visit the [Chrome Web Store page](https://chromewebstore.google.com/detail/dhjgjlklipcpfeolnkoknmacncpdhfjj/preview?hl=fr)
+1. Visit the [Chrome Web Store page](https://chromewebstore.google.com/detail/oracle-apex-autocomplete/dhjgjlklipcpfeolnkoknmacncpdhfjj?hl=fr)
 2. Click "Add to Chrome"
 3. Navigate to any Oracle APEX page with a code editor
 
