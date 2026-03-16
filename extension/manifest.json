@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Oracle APEX Autocomplete",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "SQL, PL/SQL and Oracle APEX API autocomplete for Oracle APEX code editors.",
   "permissions": [],
   "action": {
