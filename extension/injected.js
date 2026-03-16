@@ -75,6 +75,9 @@
     }
 
     var provider = window.__createCompletionProvider(window.monaco);
+    var signatureProvider = window.__createSignatureHelpProvider
+      ? window.__createSignatureHelpProvider(window.monaco)
+      : null;
 
     // Wrap provider to filter out non-PL/SQL editors
     var filteredProvider = {
@@ -94,6 +97,23 @@
       }
     };
 
+    var filteredSignatureProvider = signatureProvider ? {
+      signatureHelpTriggerCharacters: signatureProvider.signatureHelpTriggerCharacters,
+      signatureHelpRetriggerCharacters: signatureProvider.signatureHelpRetriggerCharacters,
+      provideSignatureHelp: function (model, position, token, context) {
+        var editors = getEditors();
+        for (var i = 0; i < editors.length; i++) {
+          if (editors[i].getModel() === model) {
+            if (!isPlsqlEditor(editors[i])) {
+              return null;
+            }
+            break;
+          }
+        }
+        return signatureProvider.provideSignatureHelp(model, position, token, context);
+      }
+    } : null;
+
     // Register for known language IDs
     var targets = ['plsql', 'sql', 'oracle', 'oraclesql', 'plaintext'];
     var registered = getRegisteredLanguages();
@@ -105,6 +125,10 @@
         try {
           var d = monaco.languages.registerCompletionItemProvider(lang, filteredProvider);
           disposables.push(d);
+          if (filteredSignatureProvider && monaco.languages.registerSignatureHelpProvider) {
+            var sigDisposable = monaco.languages.registerSignatureHelpProvider(lang, filteredSignatureProvider);
+            disposables.push(sigDisposable);
+          }
           count++;
           // console.log(LOG, 'Registered for "' + lang + '"');
         } catch (e) {}
@@ -117,6 +141,10 @@
       try {
         var d = monaco.languages.registerCompletionItemProvider('plaintext', filteredProvider);
         disposables.push(d);
+        if (filteredSignatureProvider && monaco.languages.registerSignatureHelpProvider) {
+          var sigDisposable = monaco.languages.registerSignatureHelpProvider('plaintext', filteredSignatureProvider);
+          disposables.push(sigDisposable);
+        }
         // console.log(LOG, 'Registered for "plaintext" (fallback)');
         count++;
       } catch (e) {

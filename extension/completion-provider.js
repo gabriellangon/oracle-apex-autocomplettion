@@ -299,7 +299,129 @@
     };
   }
 
+  function splitParams(paramsText) {
+    if (!paramsText) return [];
+    var parts = [];
+    var current = '';
+    var depth = 0;
+    for (var i = 0; i < paramsText.length; i++) {
+      var ch = paramsText.charAt(i);
+      if (ch === '(') depth++;
+      if (ch === ')') depth = Math.max(0, depth - 1);
+      if (ch === ',' && depth === 0) {
+        if (current.trim()) parts.push(current.trim());
+        current = '';
+        continue;
+      }
+      current += ch;
+    }
+    if (current.trim()) parts.push(current.trim());
+    return parts;
+  }
+
+  function parseSignature(signature) {
+    if (!signature) return null;
+    var m = signature.match(/^([^(]+)\((.*)\)(.*)$/);
+    if (!m) {
+      return { label: signature, parameters: [] };
+    }
+    return {
+      label: signature,
+      parameters: splitParams(m[2]).map(function (p) { return { label: p }; })
+    };
+  }
+
+  function buildSignatureIndex(apiDict) {
+    var map = {};
+    if (!apiDict || !apiDict.packages) return map;
+
+    apiDict.packages.forEach(function (pkg) {
+      (pkg.procedures || []).forEach(function (proc) {
+        if (!proc.signature || !proc.label) return;
+        var parsed = parseSignature(proc.signature);
+        var upperFull = proc.label.toUpperCase();
+        map[upperFull] = parsed;
+        var shortName = proc.label.indexOf('.') !== -1
+          ? proc.label.split('.').pop()
+          : proc.label;
+        if (!map[shortName.toUpperCase()]) {
+          map[shortName.toUpperCase()] = parsed;
+        }
+      });
+    });
+    return map;
+  }
+
+  function getOffsetFromPosition(text, position) {
+    var lines = text.split('\n');
+    var offset = 0;
+    for (var i = 0; i < position.lineNumber - 1; i++) {
+      offset += (lines[i] || '').length + 1;
+    }
+    return offset + (position.column - 1);
+  }
+
+  function findCallContext(text, offset) {
+    var stack = [];
+    for (var i = 0; i < offset; i++) {
+      var ch = text.charAt(i);
+      if (ch === '(') stack.push(i);
+      if (ch === ')' && stack.length) stack.pop();
+    }
+    if (!stack.length) return null;
+
+    var openParen = stack[stack.length - 1];
+    var end = openParen - 1;
+    while (end >= 0 && /\s/.test(text.charAt(end))) end--;
+    var start = end;
+    while (start >= 0 && /[A-Za-z0-9_$#.]/.test(text.charAt(start))) start--;
+    var callable = text.substring(start + 1, end + 1);
+    if (!callable) return null;
+
+    var activeParameter = 0;
+    var nestedDepth = 0;
+    for (var j = openParen + 1; j < offset; j++) {
+      var c = text.charAt(j);
+      if (c === '(') nestedDepth++;
+      else if (c === ')' && nestedDepth > 0) nestedDepth--;
+      else if (c === ',' && nestedDepth === 0) activeParameter++;
+    }
+
+    return {
+      callable: callable,
+      activeParameter: activeParameter
+    };
+  }
+
+  function createSignatureHelpProvider() {
+    var signatureIndex = buildSignatureIndex(window.__apexApi);
+
+    return {
+      signatureHelpTriggerCharacters: ['(', ','],
+      signatureHelpRetriggerCharacters: [','],
+      provideSignatureHelp: function (model, position) {
+        var code = model.getValue();
+        var offset = getOffsetFromPosition(code, position);
+        var callContext = findCallContext(code, offset);
+        if (!callContext) return null;
+
+        var signature = signatureIndex[callContext.callable.toUpperCase()];
+        if (!signature) return null;
+
+        return {
+          value: {
+            signatures: [signature],
+            activeSignature: 0,
+            activeParameter: Math.min(callContext.activeParameter, Math.max(0, signature.parameters.length - 1))
+          },
+          dispose: function () {}
+        };
+      }
+    };
+  }
+
   // Expose to injected.js
   window.__createCompletionProvider = createCompletionProvider;
+  window.__createSignatureHelpProvider = createSignatureHelpProvider;
 
 })();
