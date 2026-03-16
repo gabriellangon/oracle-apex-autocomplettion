@@ -115,6 +115,47 @@ describe('completion-provider', () => {
     expect(result.value.activeParameter).toBe(1);
   });
 
+  test('returns signature help for local standalone function', () => {
+    const provider = createSignatureHelpProvider(monaco);
+    const content = [
+      'CREATE OR REPLACE FUNCTION local_fn(p_id NUMBER, p_name VARCHAR2) RETURN NUMBER IS',
+      'BEGIN',
+      '  RETURN p_id;',
+      'END;',
+      '/',
+      'BEGIN',
+      '  local_fn(',
+      'END;'
+    ].join('\n');
+    const model = createMockEditor({ content }).getModel();
+    const position = { lineNumber: 7, column: 12 };
+
+    const result = provider.provideSignatureHelp(model, position);
+    expect(result).toBeDefined();
+    expect(result.value.signatures[0].label).toContain('local_fn(');
+    expect(result.value.signatures[0].parameters).toHaveLength(2);
+  });
+
+  test('returns signature help for local package member function', () => {
+    const provider = createSignatureHelpProvider(monaco);
+    const content = [
+      'CREATE OR REPLACE PACKAGE my_pkg IS',
+      "  FUNCTION get_name(p_id NUMBER, p_lang VARCHAR2 DEFAULT ''FR'') RETURN VARCHAR2;",
+      'END my_pkg;',
+      '/',
+      'BEGIN',
+      '  my_pkg.get_name(',
+      'END;'
+    ].join('\n');
+    const model = createMockEditor({ content }).getModel();
+    const position = { lineNumber: 6, column: 19 };
+
+    const result = provider.provideSignatureHelp(model, position);
+    expect(result).toBeDefined();
+    expect(result.value.signatures[0].label).toContain('my_pkg.get_name(');
+    expect(result.value.signatures[0].parameters).toHaveLength(2);
+  });
+
   // ── General completion ─────────────────────────
 
   test('returns SQL keywords in suggestions', () => {

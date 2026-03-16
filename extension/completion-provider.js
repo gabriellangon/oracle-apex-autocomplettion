@@ -352,6 +352,80 @@
     return map;
   }
 
+  function parseRoutineHeaders(blockText, qualifier) {
+    var entries = [];
+    if (!blockText) return entries;
+
+    var headerRe = /\b(PROCEDURE|FUNCTION)\s+(\w+)/gi;
+    var hm;
+    while ((hm = headerRe.exec(blockText)) !== null) {
+      var name = hm[2];
+      var pos = headerRe.lastIndex;
+      while (pos < blockText.length && /\s/.test(blockText.charAt(pos))) pos++;
+
+      var paramsText = '';
+      if (blockText.charAt(pos) === '(') {
+        var depth = 0;
+        var start = pos + 1;
+        for (; pos < blockText.length; pos++) {
+          var ch = blockText.charAt(pos);
+          if (ch === '(') depth++;
+          else if (ch === ')') {
+            depth--;
+            if (depth === 0) {
+              paramsText = blockText.substring(start, pos);
+              pos++;
+              break;
+            }
+          }
+        }
+      }
+
+      var fullName = qualifier ? qualifier + '.' + name : name;
+      var signature = fullName + '(' + paramsText + ')';
+      entries.push({
+        fullName: fullName,
+        shortName: name,
+        parsed: parseSignature(signature)
+      });
+    }
+
+    return entries;
+  }
+
+  function buildLocalSignatureIndex(code) {
+    var map = {};
+    if (!code) return map;
+
+    var pkgRe = /CREATE\s+(?:OR\s+REPLACE\s+)?PACKAGE(?:\s+BODY)?\s+(\w+)\s+(?:IS|AS)([\s\S]*?)END\s+\w*\s*;/gi;
+    var pm;
+    while ((pm = pkgRe.exec(code)) !== null) {
+      var pkgName = pm[1];
+      parseRoutineHeaders(pm[2] || '', pkgName).forEach(function (entry) {
+        map[entry.fullName.toUpperCase()] = entry.parsed;
+      });
+    }
+
+    var standaloneRe = /CREATE\s+(?:OR\s+REPLACE\s+)?(?:EDITIONABLE\s+)?(PROCEDURE|FUNCTION)\s+((?:\w+\.)?\w+)([\s\S]*?)(?:\bIS\b|\bAS\b|;)/gi;
+    var sm;
+    while ((sm = standaloneRe.exec(code)) !== null) {
+      var callable = sm[2];
+      var paramsMatch = sm[3].match(/\(([^)]*)\)/);
+      var paramsText = paramsMatch ? paramsMatch[1] : '';
+      var parsed = parseSignature(callable + '(' + paramsText + ')');
+      map[callable.toUpperCase()] = parsed;
+
+      var shortName = callable.indexOf('.') !== -1
+        ? callable.split('.').pop()
+        : callable;
+      if (!map[shortName.toUpperCase()]) {
+        map[shortName.toUpperCase()] = parsed;
+      }
+    }
+
+    return map;
+  }
+
   function getOffsetFromPosition(text, position) {
     var lines = text.split('\n');
     var offset = 0;
@@ -401,11 +475,13 @@
       signatureHelpRetriggerCharacters: [','],
       provideSignatureHelp: function (model, position) {
         var code = model.getValue();
+        var localSignatureIndex = buildLocalSignatureIndex(code);
+        var mergedSignatureIndex = Object.assign({}, signatureIndex, localSignatureIndex);
         var offset = getOffsetFromPosition(code, position);
         var callContext = findCallContext(code, offset);
         if (!callContext) return null;
 
-        var signature = signatureIndex[callContext.callable.toUpperCase()];
+        var signature = mergedSignatureIndex[callContext.callable.toUpperCase()];
         if (!signature) return null;
 
         return {
