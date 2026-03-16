@@ -18,6 +18,7 @@ function createMockMonaco() {
 
   const editors = [];
   const registeredProviders = [];
+  const registeredSignatureProviders = [];
   const registeredLanguages = [
     { id: 'plaintext' }, { id: 'javascript' }, { id: 'sql' }
   ];
@@ -30,6 +31,10 @@ function createMockMonaco() {
       CompletionItemInsertTextRule: { InsertAsSnippet: InsertAsSnippet },
       registerCompletionItemProvider: jest.fn(function (langId, provider) {
         registeredProviders.push({ langId, provider });
+        return { dispose: jest.fn() };
+      }),
+      registerSignatureHelpProvider: jest.fn(function (langId, provider) {
+        registeredSignatureProviders.push({ langId, provider });
         return { dispose: jest.fn() };
       }),
       getLanguages: jest.fn(function () { return registeredLanguages; }),
@@ -49,6 +54,7 @@ function createMockMonaco() {
     __test: {
       editors: editors,
       registeredProviders: registeredProviders,
+      registeredSignatureProviders: registeredSignatureProviders,
       registeredLanguages: registeredLanguages,
       editorCallbacks: editorCallbacks,
       addEditor: function (editor) { editors.push(editor); }

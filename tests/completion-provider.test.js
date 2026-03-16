@@ -6,6 +6,7 @@ const { loadScript, createMockMonaco, createMockEditor } = require('./helpers');
 
 let monaco;
 let createCompletionProvider;
+let createSignatureHelpProvider;
 
 beforeEach(() => {
   monaco = createMockMonaco();
@@ -51,6 +52,11 @@ beforeEach(() => {
                 label: 'APEX_JSON.PARSE',
                 detail: 'WWV_FLOW_JSON',
                 signature: 'APEX_JSON.PARSE(p_source IN VARCHAR2) RETURN CLOB'
+              },
+              {
+                label: 'APEX_UTIL.SET_SESSION_STATE',
+                detail: 'WWV_FLOW_UTIL',
+                signature: 'APEX_UTIL.SET_SESSION_STATE(p_name IN VARCHAR2, p_value IN VARCHAR2)'
               }
             ]
           }
@@ -64,6 +70,7 @@ beforeEach(() => {
     monaco: monaco
   });
   createCompletionProvider = ctx.window.__createCompletionProvider;
+  createSignatureHelpProvider = ctx.window.__createSignatureHelpProvider;
 });
 
 describe('completion-provider', () => {
@@ -79,6 +86,33 @@ describe('completion-provider', () => {
   test('creates a provider with provideCompletionItems function', () => {
     const provider = createCompletionProvider(monaco);
     expect(typeof provider.provideCompletionItems).toBe('function');
+  });
+
+  test('exports __createSignatureHelpProvider function', () => {
+    expect(typeof createSignatureHelpProvider).toBe('function');
+  });
+
+  test('returns signature help for known callable after "("', () => {
+    const provider = createSignatureHelpProvider(monaco);
+    const content = 'APEX_JSON.OPEN_OBJECT(';
+    const model = createMockEditor({ content }).getModel();
+    const position = { lineNumber: 1, column: content.length + 1 };
+
+    const result = provider.provideSignatureHelp(model, position);
+    expect(result).toBeDefined();
+    expect(result.value.signatures[0].label).toContain('APEX_JSON.OPEN_OBJECT');
+    expect(result.value.activeParameter).toBe(0);
+  });
+
+  test('updates active parameter for commas and nested calls', () => {
+    const provider = createSignatureHelpProvider(monaco);
+    const content = 'APEX_UTIL.SET_SESSION_STATE(dummy_fn(a, b), c';
+    const model = createMockEditor({ content }).getModel();
+    const position = { lineNumber: 1, column: content.length + 1 };
+
+    const result = provider.provideSignatureHelp(model, position);
+    expect(result).toBeDefined();
+    expect(result.value.activeParameter).toBe(1);
   });
 
   // ── General completion ─────────────────────────

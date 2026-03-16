@@ -44,6 +44,13 @@ describe('injected.js', () => {
         provideCompletionItems: jest.fn(() => ({ suggestions: [] }))
       };
     };
+    ctx.__createSignatureHelpProvider = function () {
+      return {
+        signatureHelpTriggerCharacters: ['(', ','],
+        signatureHelpRetriggerCharacters: [','],
+        provideSignatureHelp: jest.fn(() => null)
+      };
+    };
 
     loadScript('injected.js', ctx);
 
@@ -53,6 +60,7 @@ describe('injected.js', () => {
     const registeredLangs = calls.map(c => c[0]);
     expect(registeredLangs).toContain('plaintext');
     expect(registeredLangs).toContain('sql');
+    expect(monaco.languages.registerSignatureHelpProvider).toHaveBeenCalled();
   });
 
   test('configures existing editors on init', () => {
