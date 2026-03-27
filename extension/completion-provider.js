@@ -9,6 +9,8 @@
 (function () {
   'use strict';
 
+  var localAnalysisCache = typeof WeakMap === 'function' ? new WeakMap() : null;
+
   // ── CompletionItemKind mapping ───────────────
 
   function getKind(monaco, category) {
@@ -329,6 +331,45 @@
     };
   }
 
+  function getModelVersion(model, code) {
+    if (model && typeof model.getVersionId === 'function') {
+      return model.getVersionId();
+    }
+    return code;
+  }
+
+  function buildLocalAnalysis(monaco, code) {
+    var vars = (typeof window.__extractVariables === 'function')
+      ? window.__extractVariables(code) : [];
+    return {
+      code: code,
+      vars: vars,
+      localProgramData: buildLocalProgramData(monaco, code),
+      localSignatureIndex: buildLocalSignatureIndex(code)
+    };
+  }
+
+  function getLocalAnalysis(monaco, model) {
+    var code = model.getValue();
+    var version = getModelVersion(model, code);
+
+    if (localAnalysisCache && model) {
+      var cached = localAnalysisCache.get(model);
+      if (cached && cached.version === version) {
+        return cached.analysis;
+      }
+
+      var analysis = buildLocalAnalysis(monaco, code);
+      localAnalysisCache.set(model, {
+        version: version,
+        analysis: analysis
+      });
+      return analysis;
+    }
+
+    return buildLocalAnalysis(monaco, code);
+  }
+
   // ── Create the provider ──────────────────────
 
   function createCompletionProvider(monaco) {
@@ -349,9 +390,8 @@
         var range = getRange(model, position);
         var pkgPrefix = getPackagePrefix(model, position);
 
-        var code = model.getValue();
-        var localProgramData = buildLocalProgramData(monaco, code);
-        var mergedPackageMap = Object.assign({}, packageMap, localProgramData.packageMap);
+        var localAnalysis = getLocalAnalysis(monaco, model);
+        var mergedPackageMap = Object.assign({}, packageMap, localAnalysis.localProgramData.packageMap);
 
         // After a dot → show only that package's members
         if (pkgPrefix && mergedPackageMap[pkgPrefix]) {
@@ -363,11 +403,9 @@
         }
 
         // General completion: static items + live variables
-        var vars = (typeof window.__extractVariables === 'function')
-          ? window.__extractVariables(code) : [];
-        var varItems = buildVariableItems(monaco, vars);
+        var varItems = buildVariableItems(monaco, localAnalysis.vars);
 
-        var all = varItems.concat(localProgramData.items).concat(staticItems);
+        var all = varItems.concat(localAnalysis.localProgramData.items).concat(staticItems);
         return {
           suggestions: all.map(function (item) {
             return Object.assign(applyCasePreference(item), { range: range });
@@ -546,16 +584,16 @@
     };
   }
 
-  function createSignatureHelpProvider() {
+  function createSignatureHelpProvider(monaco) {
     var signatureIndex = buildSignatureIndex(window.__apexApi);
 
     return {
       signatureHelpTriggerCharacters: ['(', ','],
       signatureHelpRetriggerCharacters: [','],
       provideSignatureHelp: function (model, position) {
-        var code = model.getValue();
-        var localSignatureIndex = buildLocalSignatureIndex(code);
-        var mergedSignatureIndex = Object.assign({}, signatureIndex, localSignatureIndex);
+        var localAnalysis = getLocalAnalysis(monaco, model);
+        var mergedSignatureIndex = Object.assign({}, signatureIndex, localAnalysis.localSignatureIndex);
+        var code = localAnalysis.code;
         var offset = getOffsetFromPosition(code, position);
         var callContext = findCallContext(code, offset);
         if (!callContext) return null;

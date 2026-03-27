@@ -8,9 +8,13 @@ let monaco;
 let createCompletionProvider;
 let createSignatureHelpProvider;
 let scriptContext;
+let extractVariablesMock;
 
 beforeEach(() => {
   monaco = createMockMonaco();
+  extractVariablesMock = jest.fn(function () {
+    return [{ name: 'l_test', type: 'VARCHAR2', line: 1 }];
+  });
   scriptContext = loadScript('completion-provider.js', {
     window: {
       __sqlKeywords: {
@@ -63,9 +67,7 @@ beforeEach(() => {
           }
         ]
       },
-      __extractVariables: function (code) {
-        return [{ name: 'l_test', type: 'VARCHAR2', line: 1 }];
-      },
+      __extractVariables: extractVariablesMock,
       monaco: monaco
     },
     monaco: monaco
@@ -103,6 +105,56 @@ describe('completion-provider', () => {
     expect(result).toBeDefined();
     expect(result.value.signatures[0].label).toContain('APEX_JSON.OPEN_OBJECT');
     expect(result.value.activeParameter).toBe(0);
+  });
+
+  test('reuses cached local analysis when model version does not change', () => {
+    const provider = createCompletionProvider(monaco);
+    const editor = createMockEditor({ content: 'DECLARE\nl_test VARCHAR2(100);\nBEGIN\nAPEX_JSON.' });
+    const model = editor.getModel();
+    model.getLineContent.mockReturnValue('APEX_JSON.');
+    model.getWordUntilPosition.mockReturnValue({ word: '', startColumn: 11, endColumn: 11 });
+    const position = { lineNumber: 4, column: 11 };
+
+    provider.provideCompletionItems(model, position);
+    provider.provideCompletionItems(model, position);
+
+    expect(extractVariablesMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('invalidates cached local analysis when model version changes', () => {
+    const provider = createCompletionProvider(monaco);
+    const editor = createMockEditor({ content: 'DECLARE\nl_test VARCHAR2(100);\nBEGIN\nNULL;\nEND;', versionId: 1 });
+    const model = editor.getModel();
+    const position = { lineNumber: 1, column: 1 };
+
+    provider.provideCompletionItems(model, position);
+    editor.__setContent('DECLARE\nl_test VARCHAR2(100);\nBEGIN\nx := 1;\nEND;');
+    editor.__setVersionId(2);
+    provider.provideCompletionItems(model, position);
+
+    expect(extractVariablesMock).toHaveBeenCalledTimes(2);
+  });
+
+  test('shares cached local analysis between completion and signature help', () => {
+    const completionProvider = createCompletionProvider(monaco);
+    const signatureProvider = createSignatureHelpProvider(monaco);
+    const content = [
+      'CREATE OR REPLACE FUNCTION local_fn(p_id NUMBER, p_name VARCHAR2) RETURN NUMBER IS',
+      'BEGIN',
+      '  RETURN p_id;',
+      'END;',
+      '/',
+      'BEGIN',
+      '  local_fn(',
+      'END;'
+    ].join('\n');
+    const editor = createMockEditor({ content, versionId: 5 });
+    const model = editor.getModel();
+
+    completionProvider.provideCompletionItems(model, { lineNumber: 7, column: 11 });
+    signatureProvider.provideSignatureHelp(model, { lineNumber: 7, column: 12 });
+
+    expect(extractVariablesMock).toHaveBeenCalledTimes(1);
   });
 
   test('uses lowercase completion case for APEX signature help parameters', () => {

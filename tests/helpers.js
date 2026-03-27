@@ -75,10 +75,12 @@ function createMockEditor(options) {
   options = options || {};
   var languageId = options.languageId || 'plaintext';
   var content = options.content || '';
+  var versionId = options.versionId || 1;
 
   var model = {
     getLanguageId: jest.fn(function () { return languageId; }),
     getValue: jest.fn(function () { return content; }),
+    getVersionId: jest.fn(function () { return versionId; }),
     getLineContent: jest.fn(function (lineNum) {
       var lines = content.split('\n');
       return lines[lineNum - 1] || '';
@@ -92,7 +94,9 @@ function createMockEditor(options) {
     getModel: jest.fn(function () { return model; }),
     getDomNode: jest.fn(function () { return options.domNode || null; }),
     updateOptions: jest.fn(),
-    __model: model
+    __model: model,
+    __setContent: function (nextContent) { content = nextContent; },
+    __setVersionId: function (nextVersionId) { versionId = nextVersionId; }
   };
 }
 
