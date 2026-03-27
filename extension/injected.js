@@ -15,6 +15,18 @@
   var configuredEditors = new WeakSet();
   var disposables = [];
   var hasLoggedMonacoWait = false;
+  var TARGET_LANGUAGES = ['plsql', 'sql', 'oracle', 'oraclesql', 'plaintext'];
+
+  function normalizeCompletionCase(value) {
+    return value === 'lower' ? 'lower' : 'upper';
+  }
+
+  if (!window.__apexAutocompleteSettings) {
+    window.__apexAutocompleteSettings = {};
+  }
+  window.__apexAutocompleteSettings.completionCase = normalizeCompletionCase(
+    window.__apexAutocompleteSettings.completionCase
+  );
 
   // ── Language detection ───────────────────────
 
@@ -62,6 +74,41 @@
     } catch (e) {
       return [];
     }
+  }
+
+  function getSupportedTargetLanguages() {
+    var registered = getRegisteredLanguages();
+    return TARGET_LANGUAGES.filter(function (lang) {
+      return lang === 'plaintext' || registered.indexOf(lang) !== -1;
+    });
+  }
+
+  function registerLanguageConfiguration() {
+    if (!window.monaco || !window.monaco.languages ||
+        typeof window.monaco.languages.setLanguageConfiguration !== 'function') {
+      return;
+    }
+
+    var config = {
+      brackets: [['(', ')']],
+      autoClosingPairs: [
+        { open: '(', close: ')' },
+        { open: "'", close: "'", notIn: ['string', 'comment'] },
+        { open: '"', close: '"', notIn: ['string', 'comment'] }
+      ],
+      surroundingPairs: [
+        { open: '(', close: ')' },
+        { open: "'", close: "'" },
+        { open: '"', close: '"' }
+      ]
+    };
+
+    getSupportedTargetLanguages().forEach(function (lang) {
+      try {
+        var disposable = monaco.languages.setLanguageConfiguration(lang, config);
+        if (disposable) disposables.push(disposable);
+      } catch (e) {}
+    });
   }
 
   // ── Register completion provider ─────────────
@@ -115,24 +162,20 @@
     } : null;
 
     // Register for known language IDs
-    var targets = ['plsql', 'sql', 'oracle', 'oraclesql', 'plaintext'];
-    var registered = getRegisteredLanguages();
+    var targets = getSupportedTargetLanguages();
     var count = 0;
 
     targets.forEach(function (lang) {
-      // Only register if language exists or is 'plaintext' (always exists)
-      if (lang === 'plaintext' || registered.indexOf(lang) !== -1) {
-        try {
-          var d = monaco.languages.registerCompletionItemProvider(lang, filteredProvider);
-          disposables.push(d);
-          if (filteredSignatureProvider && monaco.languages.registerSignatureHelpProvider) {
-            var sigDisposable = monaco.languages.registerSignatureHelpProvider(lang, filteredSignatureProvider);
-            disposables.push(sigDisposable);
-          }
-          count++;
-          // console.log(LOG, 'Registered for "' + lang + '"');
-        } catch (e) {}
-      }
+      try {
+        var d = monaco.languages.registerCompletionItemProvider(lang, filteredProvider);
+        disposables.push(d);
+        if (filteredSignatureProvider && monaco.languages.registerSignatureHelpProvider) {
+          var sigDisposable = monaco.languages.registerSignatureHelpProvider(lang, filteredSignatureProvider);
+          disposables.push(sigDisposable);
+        }
+        count++;
+        // console.log(LOG, 'Registered for "' + lang + '"');
+      } catch (e) {}
     });
 
     // If none of the SQL languages were found, register on plaintext
@@ -205,6 +248,10 @@
         quickSuggestions: { other: true, comments: false, strings: false },
         suggestOnTriggerCharacters: true,
         wordBasedSuggestions: true,
+        autoClosingBrackets: 'always',
+        autoClosingQuotes: 'always',
+        autoSurround: 'languageDefined',
+        matchBrackets: 'always',
         // Keep suggest/parameter widgets anchored to the editor viewport.
         // This avoids offset tooltips in APEX layouts that use transformed
         // containers (dialogs, split panes, sticky regions).
@@ -243,6 +290,7 @@
       console.error(LOG, 'Failed to register any completion provider');
       return;
     }
+    registerLanguageConfiguration();
 
     // 2. Configure existing editors
     var editors = getEditors();
@@ -283,6 +331,17 @@
 
     // console.log(LOG, '✓ Active — SQL / PL/SQL / APEX API autocomplete enabled');
   }
+
+  document.addEventListener('__apexSetCompletionCase', function (e) {
+    var data = {};
+    try {
+      data = typeof e.detail === 'string' ? JSON.parse(e.detail) : (e.detail || {});
+    } catch (err) {}
+
+    if (data && Object.prototype.hasOwnProperty.call(data, 'completionCase')) {
+      window.__apexAutocompleteSettings.completionCase = normalizeCompletionCase(data.completionCase);
+    }
+  });
 
   init();
 })();

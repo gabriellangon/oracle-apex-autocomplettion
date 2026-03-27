@@ -8,3 +8,4 @@ dist/
 
 # Generated CSV exports (large files, can be regenerated)
 scripts/*.csv
+.osgrep

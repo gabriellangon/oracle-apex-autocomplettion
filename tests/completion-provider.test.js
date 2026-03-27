@@ -7,10 +7,11 @@ const { loadScript, createMockMonaco, createMockEditor } = require('./helpers');
 let monaco;
 let createCompletionProvider;
 let createSignatureHelpProvider;
+let scriptContext;
 
 beforeEach(() => {
   monaco = createMockMonaco();
-  const ctx = loadScript('completion-provider.js', {
+  scriptContext = loadScript('completion-provider.js', {
     window: {
       __sqlKeywords: {
         keywords: [
@@ -34,7 +35,7 @@ beforeEach(() => {
           {
             label: 'IF-THEN-ELSE',
             detail: 'If block',
-            insertText: 'IF ${1:condition} THEN\n  ${2}\nEND IF;'
+            insertText: 'IF ${1:Condition} THEN\n  ${2:DoWork}\nEND IF;'
           }
         ]
       },
@@ -69,8 +70,8 @@ beforeEach(() => {
     },
     monaco: monaco
   });
-  createCompletionProvider = ctx.window.__createCompletionProvider;
-  createSignatureHelpProvider = ctx.window.__createSignatureHelpProvider;
+  createCompletionProvider = scriptContext.window.__createCompletionProvider;
+  createSignatureHelpProvider = scriptContext.window.__createSignatureHelpProvider;
 });
 
 describe('completion-provider', () => {
@@ -102,6 +103,20 @@ describe('completion-provider', () => {
     expect(result).toBeDefined();
     expect(result.value.signatures[0].label).toContain('APEX_JSON.OPEN_OBJECT');
     expect(result.value.activeParameter).toBe(0);
+  });
+
+  test('uses lowercase completion case for APEX signature help parameters', () => {
+    scriptContext.window.__apexAutocompleteSettings = { completionCase: 'lower' };
+
+    const provider = createSignatureHelpProvider(monaco);
+    const content = 'apex_json.open_object(';
+    const model = createMockEditor({ content }).getModel();
+    const position = { lineNumber: 1, column: content.length + 1 };
+
+    const result = provider.provideSignatureHelp(model, position);
+    expect(result).toBeDefined();
+    expect(result.value.signatures[0].label).toContain('apex_json.open_object');
+    expect(result.value.signatures[0].parameters[0].label).toBe('p_name in varchar2 default null');
   });
 
   test('updates active parameter for commas and nested calls', () => {
@@ -209,6 +224,52 @@ describe('completion-provider', () => {
     expect(snippetLabels).toContain('IF-THEN-ELSE');
   });
 
+  test('uses uppercase completion case by default for keywords', () => {
+    const provider = createCompletionProvider(monaco);
+    const model = createMockEditor({ content: 'sel' }).getModel();
+    const position = { lineNumber: 1, column: 4 };
+
+    const result = provider.provideCompletionItems(model, position);
+    const selectItem = result.suggestions.find(s => s.detail === 'Retrieve data');
+
+    expect(selectItem.label).toBe('SELECT');
+    expect(selectItem.insertText).toBe('SELECT');
+  });
+
+  test('uses lowercase completion case for keywords and APEX dictionary items without changing variables', () => {
+    scriptContext.window.__apexAutocompleteSettings = { completionCase: 'lower' };
+
+    const provider = createCompletionProvider(monaco);
+    const model = createMockEditor({ content: 'sel' }).getModel();
+    const position = { lineNumber: 1, column: 4 };
+
+    const result = provider.provideCompletionItems(model, position);
+    const selectItem = result.suggestions.find(s => s.detail === 'Retrieve data');
+    const apexPkg = result.suggestions.find(s => s.label === 'apex_json');
+    const apexProc = result.suggestions.find(s => s.label === 'apex_json.open_object');
+    const variable = result.suggestions.find(s => s.label === 'l_test');
+
+    expect(selectItem.label).toBe('select');
+    expect(selectItem.insertText).toBe('select');
+    expect(apexPkg.insertText).toBe('apex_json');
+    expect(apexProc.insertText).toBe('apex_json.open_object');
+    expect(variable.insertText).toBe('l_test');
+  });
+
+  test('uses lowercase completion case for snippets while preserving placeholders', () => {
+    scriptContext.window.__apexAutocompleteSettings = { completionCase: 'lower' };
+
+    const provider = createCompletionProvider(monaco);
+    const model = createMockEditor({ content: '' }).getModel();
+    const position = { lineNumber: 1, column: 1 };
+
+    const result = provider.provideCompletionItems(model, position);
+    const snippet = result.suggestions.find(s => s.detail === 'If block');
+
+    expect(snippet.label).toBe('if-then-else');
+    expect(snippet.insertText).toBe('if ${1:Condition} then\n  ${2:DoWork}\nend if;');
+  });
+
   test('shows only callable kind in top-level detail', () => {
     const provider = createCompletionProvider(monaco);
     const editor = createMockEditor({ content: '' });
@@ -280,6 +341,26 @@ describe('completion-provider', () => {
 
     // Should NOT contain top-level items
     expect(labels).not.toContain('SELECT');
+  });
+
+  test('returns lowercase APEX package members after typing package prefix when completion case is lower', () => {
+    scriptContext.window.__apexAutocompleteSettings = { completionCase: 'lower' };
+
+    const provider = createCompletionProvider(monaco);
+    const content = 'APEX_JSON.';
+    const model = createMockEditor({ content }).getModel();
+    model.getLineContent.mockReturnValue('APEX_JSON.');
+    model.getWordUntilPosition.mockReturnValue({ word: '', startColumn: 11, endColumn: 11 });
+
+    const position = { lineNumber: 1, column: 11 };
+    const result = provider.provideCompletionItems(model, position);
+
+    const labels = result.suggestions.map(s => s.label);
+    expect(labels).toContain('open_object');
+    expect(labels).toContain('parse');
+    const openObject = result.suggestions.find(s => s.label === 'open_object');
+    expect(openObject.insertText).toBe('open_object');
+    expect(openObject.detail).toBe('procedure');
   });
 
   test('returns local package members after typing local package prefix', () => {

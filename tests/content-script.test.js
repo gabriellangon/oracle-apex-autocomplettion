@@ -11,7 +11,8 @@ describe('content-script', () => {
   let chrome;
   let ctx;
 
-  function buildContext() {
+  function buildContext(options) {
+    options = options || {};
     chrome = createMockChrome();
     const scriptElements = [];
 
@@ -28,6 +29,9 @@ describe('content-script', () => {
     ctx.fetch = jest.fn(() =>
       Promise.resolve({ json: () => Promise.resolve({ keywords: [] }) })
     );
+    chrome.storage.sync.get.mockImplementation((defaults, cb) => {
+      cb({ completionCase: options.completionCase || defaults.completionCase || 'upper' });
+    });
 
     // Mock document with event support + script injection
     const eventTarget = new EventTarget();
@@ -49,11 +53,11 @@ describe('content-script', () => {
       head: {
         appendChild: jest.fn((el) => {
           // Simulate script loading
-          if (el.onload) setTimeout(() => el.onload(), 0);
+          if (el.onload) ctx.setTimeout(() => el.onload(), 0);
         })
       },
       documentElement: {
-        getAttribute: jest.fn(() => null),
+        getAttribute: jest.fn(() => (options.monacoReady ? '1' : null)),
         setAttribute: jest.fn()
       },
       addEventListener: jest.fn((type, handler) => {
@@ -145,6 +149,26 @@ describe('content-script', () => {
     expect(ctx.document.dispatchEvent).toHaveBeenCalled();
   });
 
+  test('message listener handles SET_COMPLETION_CASE', () => {
+    const ctx = buildContext();
+    loadContentScript(ctx);
+
+    const listener = chrome.runtime.onMessage.addListener.mock.calls[0][0];
+    const sendResponse = jest.fn();
+
+    listener(
+      { type: 'SET_COMPLETION_CASE', completionCase: 'lower' },
+      {},
+      sendResponse
+    );
+
+    expect(sendResponse).toHaveBeenCalledWith({ ok: true });
+    const caseEvent = ctx.document.dispatchEvent.mock.calls.find(
+      (call) => call[0] && call[0].type === '__apexSetCompletionCase'
+    );
+    expect(caseEvent).toBeDefined();
+  });
+
   test('injects Monaco poller script', () => {
     const ctx = buildContext();
     loadContentScript(ctx);
@@ -171,5 +195,19 @@ describe('content-script', () => {
     loadContentScript(ctx);
 
     expect(ctx.MutationObserver).toHaveBeenCalled();
+  });
+
+  test('loads stored completion case during injection bootstrap', async () => {
+    const ctx = buildContext({ monacoReady: true, completionCase: 'lower' });
+    loadContentScript(ctx);
+
+    for (let i = 0; i < 10; i++) {
+      await Promise.resolve();
+    }
+
+    expect(chrome.storage.sync.get).toHaveBeenCalledWith(
+      { completionCase: 'upper' },
+      expect.any(Function)
+    );
   });
 });

@@ -45,6 +45,33 @@
       });
   }
 
+  function normalizeCompletionCase(value) {
+    return value === 'lower' ? 'lower' : 'upper';
+  }
+
+  function dispatchCompletionCase(value) {
+    document.dispatchEvent(new CustomEvent('__apexSetCompletionCase', {
+      detail: JSON.stringify({
+        completionCase: normalizeCompletionCase(value)
+      })
+    }));
+  }
+
+  function getStoredCompletionCase() {
+    return new Promise(function (resolve) {
+      if (!chrome.storage || !chrome.storage.sync || !chrome.storage.sync.get) {
+        resolve('upper');
+        return;
+      }
+
+      chrome.storage.sync.get({ completionCase: 'upper' }, function (items) {
+        resolve(normalizeCompletionCase(items && items.completionCase));
+      });
+    });
+  }
+
+  var storedCompletionCasePromise = getStoredCompletionCase();
+
   // ── injection sequence ───────────────────────
 
   async function injectAll() {
@@ -63,6 +90,7 @@
       await injectScript('parsers/variable-parser.js');
       await injectScript('completion-provider.js');
       await injectScript('injected.js');
+      dispatchCompletionCase(await storedCompletionCasePromise);
 
       // Step 4: Inject language switcher (for popup communication)
       await injectScript('language-switcher.js');
@@ -133,6 +161,12 @@
           languageId: msg.languageId
         })
       }));
+      sendResponse({ ok: true });
+      return false;
+    }
+
+    if (msg.type === 'SET_COMPLETION_CASE') {
+      dispatchCompletionCase(msg.completionCase);
       sendResponse({ ok: true });
       return false;
     }

@@ -19,6 +19,7 @@ function createMockMonaco() {
   const editors = [];
   const registeredProviders = [];
   const registeredSignatureProviders = [];
+  const registeredLanguageConfigurations = [];
   const registeredLanguages = [
     { id: 'plaintext' }, { id: 'javascript' }, { id: 'sql' }
   ];
@@ -35,6 +36,10 @@ function createMockMonaco() {
       }),
       registerSignatureHelpProvider: jest.fn(function (langId, provider) {
         registeredSignatureProviders.push({ langId, provider });
+        return { dispose: jest.fn() };
+      }),
+      setLanguageConfiguration: jest.fn(function (langId, config) {
+        registeredLanguageConfigurations.push({ langId, config });
         return { dispose: jest.fn() };
       }),
       getLanguages: jest.fn(function () { return registeredLanguages; }),
@@ -55,6 +60,7 @@ function createMockMonaco() {
       editors: editors,
       registeredProviders: registeredProviders,
       registeredSignatureProviders: registeredSignatureProviders,
+      registeredLanguageConfigurations: registeredLanguageConfigurations,
       registeredLanguages: registeredLanguages,
       editorCallbacks: editorCallbacks,
       addEditor: function (editor) { editors.push(editor); }
@@ -102,6 +108,16 @@ function createMockChrome() {
       },
       lastError: null,
       sendMessage: jest.fn()
+    },
+    storage: {
+      sync: {
+        get: jest.fn(function (defaults, cb) {
+          cb(Object.assign({}, defaults));
+        }),
+        set: jest.fn(function (items, cb) {
+          if (cb) cb();
+        })
+      }
     },
     tabs: {
       query: jest.fn(),

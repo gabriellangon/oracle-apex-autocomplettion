@@ -22,6 +22,39 @@
     var listEl = document.getElementById('editors-list');
     var statusEl = document.getElementById('status');
     var noEditors = document.getElementById('no-editors');
+    var completionCaseEl = document.getElementById('completion-case');
+
+    function normalizeCompletionCase(value) {
+        return value === 'lower' ? 'lower' : 'upper';
+    }
+
+    function loadCompletionCase() {
+        if (!completionCaseEl || !chrome.storage || !chrome.storage.sync) return;
+
+        chrome.storage.sync.get({ completionCase: 'upper' }, function (items) {
+            completionCaseEl.value = normalizeCompletionCase(items && items.completionCase);
+        });
+    }
+
+    function setCompletionCase(value) {
+        var normalized = normalizeCompletionCase(value);
+
+        if (completionCaseEl) {
+            completionCaseEl.value = normalized;
+        }
+
+        if (chrome.storage && chrome.storage.sync && chrome.storage.sync.set) {
+            chrome.storage.sync.set({ completionCase: normalized });
+        }
+
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+            if (!tabs[0]) return;
+            chrome.tabs.sendMessage(tabs[0].id, {
+                type: 'SET_COMPLETION_CASE',
+                completionCase: normalized
+            });
+        });
+    }
 
     // ── Ask the content script for editors ──────
 
@@ -156,6 +189,13 @@
     }
 
     // ── Init ────────────────────────────────────
+    if (completionCaseEl) {
+        completionCaseEl.addEventListener('change', function () {
+            setCompletionCase(this.value);
+            showToast('Completion case updated');
+        });
+        loadCompletionCase();
+    }
 
     requestEditors();
 })();

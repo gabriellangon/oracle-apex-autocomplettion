@@ -15,6 +15,10 @@ describe('popup.js', () => {
   beforeEach(() => {
     // Set up the DOM that popup.html would provide
     document.body.innerHTML = `
+      <select id="completion-case">
+        <option value="upper">Uppercase</option>
+        <option value="lower">Lowercase</option>
+      </select>
       <div id="status"></div>
       <div id="editors-list"></div>
       <div id="no-editors" style="display: none;">No editors found</div>
@@ -126,7 +130,7 @@ describe('popup.js', () => {
       ]
     });
 
-    const select = document.querySelector('select');
+    const select = document.querySelector('.editor-card select');
     expect(select).not.toBeNull();
     const optionValues = Array.from(select.options).map(o => o.value);
     expect(optionValues).toContain('plsql');
@@ -144,7 +148,7 @@ describe('popup.js', () => {
       ]
     });
 
-    const select = document.querySelector('select');
+    const select = document.querySelector('.editor-card select');
     select.value = 'javascript';
     select.dispatchEvent(new Event('change'));
 
@@ -155,6 +159,39 @@ describe('popup.js', () => {
     expect(setLangCall).toBeDefined();
     expect(setLangCall[1].languageId).toBe('javascript');
     expect(setLangCall[1].editorIndex).toBe(0);
+  });
+
+  test('loads completion case from storage', () => {
+    chrome.storage.sync.get.mockImplementation((defaults, cb) => {
+      cb({ completionCase: 'lower' });
+    });
+
+    loadPopup({
+      editors: [
+        { index: 0, language: 'plsql', hint: '' }
+      ]
+    });
+
+    expect(document.getElementById('completion-case').value).toBe('lower');
+  });
+
+  test('changing completion case stores it and notifies the active tab', () => {
+    loadPopup({
+      editors: [
+        { index: 0, language: 'plsql', hint: '' }
+      ]
+    });
+
+    const select = document.getElementById('completion-case');
+    select.value = 'lower';
+    select.dispatchEvent(new Event('change'));
+
+    expect(chrome.storage.sync.set).toHaveBeenCalledWith({ completionCase: 'lower' });
+    const setCaseCall = chrome.tabs.sendMessage.mock.calls.find(
+      call => call[1] && call[1].type === 'SET_COMPLETION_CASE'
+    );
+    expect(setCaseCall).toBeDefined();
+    expect(setCaseCall[1].completionCase).toBe('lower');
   });
 
   test('editor card shows language badge', () => {

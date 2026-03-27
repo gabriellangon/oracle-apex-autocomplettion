@@ -1,6 +1,6 @@
 {
   "name": "oracle-apex-autocomplete",
-  "version": "1.1.0",
+  "version": "1.2.4",
   "private": true,
   "description": "SQL, PL/SQL and Oracle APEX API autocomplete for Oracle APEX code editors.",
   "scripts": {

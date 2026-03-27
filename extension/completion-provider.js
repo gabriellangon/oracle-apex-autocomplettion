@@ -45,6 +45,79 @@
     return name + '(\n  ' + paramList.join(',\n  ') + '\n)' + suffix;
   }
 
+  function getCompletionCase() {
+    if (!window.__apexAutocompleteSettings) return 'upper';
+    return window.__apexAutocompleteSettings.completionCase === 'lower' ? 'lower' : 'upper';
+  }
+
+  function applyCompletionCase(text, mode) {
+    if (!text) return text;
+    return mode === 'lower' ? text.toLowerCase() : text.toUpperCase();
+  }
+
+  function applyCompletionCaseToSnippet(text, mode) {
+    if (!text) return text;
+
+    var result = '';
+    var lastIndex = 0;
+    var placeholderRe = /\$\{[^}]*\}|\$\d+/g;
+    var match;
+
+    while ((match = placeholderRe.exec(text)) !== null) {
+      result += applyCompletionCase(text.substring(lastIndex, match.index), mode);
+      result += match[0];
+      lastIndex = match.index + match[0].length;
+    }
+
+    result += applyCompletionCase(text.substring(lastIndex), mode);
+    return result;
+  }
+
+  function applyCasePreference(item) {
+    var mode = getCompletionCase();
+    var result = Object.assign({}, item);
+
+    if (result.__apexCaseType === 'keyword') {
+      var keywordText = applyCompletionCase(result.label, mode);
+      result.label = keywordText;
+      result.insertText = keywordText;
+      result.filterText = keywordText;
+    } else if (result.__apexCaseType === 'snippet') {
+      result.label = applyCompletionCase(result.label, mode);
+      result.insertText = applyCompletionCaseToSnippet(result.insertText, mode);
+    } else if (result.__apexCaseType === 'apex') {
+      result.label = applyCompletionCase(result.label, mode);
+      result.insertText = applyCompletionCase(result.insertText, mode);
+      if (typeof result.filterText === 'string') {
+        result.filterText = applyCompletionCase(result.filterText, mode);
+      }
+    }
+
+    delete result.__apexCaseType;
+    return result;
+  }
+
+  function applyCasePreferenceToSignature(signature) {
+    if (!signature) return signature;
+
+    var mode = getCompletionCase();
+    var result = {
+      label: signature.label,
+      parameters: (signature.parameters || []).map(function (parameter) {
+        return { label: parameter.label };
+      })
+    };
+
+    if (signature.__apexCaseType === 'apex') {
+      result.label = applyCompletionCase(result.label, mode);
+      result.parameters = result.parameters.map(function (parameter) {
+        return { label: applyCompletionCase(parameter.label, mode) };
+      });
+    }
+
+    return result;
+  }
+
 
   // ── Build items from dictionaries ────────────
 
@@ -57,7 +130,8 @@
         detail:     kw.detail || kw.category,
         insertText: kw.label,
         sortText:   '2_' + kw.label,
-        filterText: kw.label
+        filterText: kw.label,
+        __apexCaseType: 'keyword'
       };
     });
   }
@@ -72,7 +146,8 @@
         insertText:      sn.insertText,
         insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
         sortText:        '4_' + sn.label,
-        documentation:   sn.detail || ''
+        documentation:   sn.detail || '',
+        __apexCaseType:  'snippet'
       };
     });
   }
@@ -86,7 +161,8 @@
         kind:       getKind(monaco, 'apex_pkg'),
         detail:     'APEX Package',
         insertText: pkg.name,
-        sortText:   '3_' + pkg.name
+        sortText:   '3_' + pkg.name,
+        __apexCaseType: 'apex'
       });
       if (!pkg.procedures) return;
       pkg.procedures.forEach(function (proc) {
@@ -112,7 +188,8 @@
           detail:        detail,
           insertText:    proc.label,
           documentation: { value: docParts.join('\n\n') },
-          sortText:      '3_' + proc.label
+          sortText:      '3_' + proc.label,
+          __apexCaseType: 'apex'
         });
       });
     });
@@ -218,7 +295,8 @@
           detail:        detail,
           insertText:    shortName,
           documentation: { value: docParts.join('\n\n') },
-          sortText:      '1_' + shortName
+          sortText:      '1_' + shortName,
+          __apexCaseType: 'apex'
         };
       });
     });
@@ -279,7 +357,7 @@
         if (pkgPrefix && mergedPackageMap[pkgPrefix]) {
           return {
             suggestions: mergedPackageMap[pkgPrefix].map(function (item) {
-              return Object.assign({}, item, { range: range });
+              return Object.assign(applyCasePreference(item), { range: range });
             })
           };
         }
@@ -292,7 +370,7 @@
         var all = varItems.concat(localProgramData.items).concat(staticItems);
         return {
           suggestions: all.map(function (item) {
-            return Object.assign({}, item, { range: range });
+            return Object.assign(applyCasePreference(item), { range: range });
           })
         };
       }
@@ -319,15 +397,16 @@
     return parts;
   }
 
-  function parseSignature(signature) {
+  function parseSignature(signature, caseType) {
     if (!signature) return null;
     var m = signature.match(/^([^(]+)\((.*)\)(.*)$/);
     if (!m) {
-      return { label: signature, parameters: [] };
+      return { label: signature, parameters: [], __apexCaseType: caseType || null };
     }
     return {
       label: signature,
-      parameters: splitParams(m[2]).map(function (p) { return { label: p }; })
+      parameters: splitParams(m[2]).map(function (p) { return { label: p }; }),
+      __apexCaseType: caseType || null
     };
   }
 
@@ -338,7 +417,7 @@
     apiDict.packages.forEach(function (pkg) {
       (pkg.procedures || []).forEach(function (proc) {
         if (!proc.signature || !proc.label) return;
-        var parsed = parseSignature(proc.signature);
+        var parsed = parseSignature(proc.signature, 'apex');
         var upperFull = proc.label.toUpperCase();
         map[upperFull] = parsed;
         var shortName = proc.label.indexOf('.') !== -1
@@ -386,7 +465,7 @@
       entries.push({
         fullName: fullName,
         shortName: name,
-        parsed: parseSignature(signature)
+        parsed: parseSignature(signature, 'local')
       });
     }
 
@@ -412,7 +491,7 @@
       var callable = sm[2];
       var paramsMatch = sm[3].match(/\(([^)]*)\)/);
       var paramsText = paramsMatch ? paramsMatch[1] : '';
-      var parsed = parseSignature(callable + '(' + paramsText + ')');
+      var parsed = parseSignature(callable + '(' + paramsText + ')', 'local');
       map[callable.toUpperCase()] = parsed;
 
       var shortName = callable.indexOf('.') !== -1
@@ -483,12 +562,13 @@
 
         var signature = mergedSignatureIndex[callContext.callable.toUpperCase()];
         if (!signature) return null;
+        var displaySignature = applyCasePreferenceToSignature(signature);
 
         return {
           value: {
-            signatures: [signature],
+            signatures: [displaySignature],
             activeSignature: 0,
-            activeParameter: Math.min(callContext.activeParameter, Math.max(0, signature.parameters.length - 1))
+            activeParameter: Math.min(callContext.activeParameter, Math.max(0, displaySignature.parameters.length - 1))
           },
           dispose: function () {}
         };

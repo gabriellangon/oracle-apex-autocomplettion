@@ -14,16 +14,25 @@ describe('injected.js', () => {
     monaco = createMockMonaco();
   });
 
+  function createDocumentStub() {
+    const eventTarget = new EventTarget();
+    return {
+      querySelectorAll: jest.fn(() => []),
+      body: {},
+      documentElement: document.documentElement,
+      addEventListener: eventTarget.addEventListener.bind(eventTarget),
+      removeEventListener: eventTarget.removeEventListener.bind(eventTarget),
+      dispatchEvent: eventTarget.dispatchEvent.bind(eventTarget)
+    };
+  }
+
   test('registers completion provider on available languages', () => {
     // Pre-load completion-provider so __createCompletionProvider exists
     const ctx = {};
     ctx.window = ctx;
     ctx.console = { log: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() };
-    ctx.document = {
-      querySelectorAll: jest.fn(() => []),
-      body: { childList: true },
-      documentElement: document.documentElement
-    };
+    ctx.document = createDocumentStub();
+    ctx.document.body = { childList: true };
     ctx.setTimeout = jest.fn((fn) => fn());
     ctx.clearInterval = clearInterval;
     ctx.setInterval = setInterval;
@@ -61,6 +70,17 @@ describe('injected.js', () => {
     expect(registeredLangs).toContain('plaintext');
     expect(registeredLangs).toContain('sql');
     expect(monaco.languages.registerSignatureHelpProvider).toHaveBeenCalled();
+    expect(monaco.languages.setLanguageConfiguration).toHaveBeenCalled();
+    const sqlConfigCall = monaco.languages.setLanguageConfiguration.mock.calls.find(
+      (call) => call[0] === 'sql'
+    );
+    expect(sqlConfigCall).toBeDefined();
+    expect(sqlConfigCall[1].brackets).toEqual([['(', ')']]);
+    expect(sqlConfigCall[1].autoClosingPairs).toEqual([
+      { open: '(', close: ')' },
+      { open: "'", close: "'", notIn: ['string', 'comment'] },
+      { open: '"', close: '"', notIn: ['string', 'comment'] }
+    ]);
   });
 
   test('configures existing editors on init', () => {
@@ -70,11 +90,7 @@ describe('injected.js', () => {
     const ctx = {};
     ctx.window = ctx;
     ctx.console = { log: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() };
-    ctx.document = {
-      querySelectorAll: jest.fn(() => []),
-      body: {},
-      documentElement: document.documentElement
-    };
+    ctx.document = createDocumentStub();
     ctx.setTimeout = jest.fn((fn) => fn());
     ctx.clearInterval = clearInterval;
     ctx.setInterval = setInterval;
@@ -102,6 +118,10 @@ describe('injected.js', () => {
     expect(opts.quickSuggestions).toBeDefined();
     expect(opts.suggestOnTriggerCharacters).toBe(true);
     expect(opts.fixedOverflowWidgets).toBe(true);
+    expect(opts.autoClosingBrackets).toBe('always');
+    expect(opts.autoClosingQuotes).toBe('always');
+    expect(opts.autoSurround).toBe('languageDefined');
+    expect(opts.matchBrackets).toBe('always');
   });
 
   test('skips non-PL/SQL editors (JavaScript)', () => {
@@ -111,11 +131,7 @@ describe('injected.js', () => {
     const ctx = {};
     ctx.window = ctx;
     ctx.console = { log: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() };
-    ctx.document = {
-      querySelectorAll: jest.fn(() => []),
-      body: {},
-      documentElement: document.documentElement
-    };
+    ctx.document = createDocumentStub();
     ctx.setTimeout = jest.fn((fn) => fn());
     ctx.clearInterval = clearInterval;
     ctx.setInterval = setInterval;
@@ -145,11 +161,7 @@ describe('injected.js', () => {
     const ctx = {};
     ctx.window = ctx;
     ctx.console = { log: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() };
-    ctx.document = {
-      querySelectorAll: jest.fn(() => []),
-      body: {},
-      documentElement: document.documentElement
-    };
+    ctx.document = createDocumentStub();
     ctx.setTimeout = jest.fn((fn) => fn());
     ctx.clearInterval = clearInterval;
     ctx.setInterval = setInterval;
@@ -171,17 +183,14 @@ describe('injected.js', () => {
 
     loadScript('injected.js', ctx);
     expect(ctx.__apexAutocompleteActive).toBe(true);
+    expect(ctx.__apexAutocompleteSettings.completionCase).toBe('upper');
   });
 
   test('watches for new editors with onDidCreateEditor', () => {
     const ctx = {};
     ctx.window = ctx;
     ctx.console = { log: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() };
-    ctx.document = {
-      querySelectorAll: jest.fn(() => []),
-      body: {},
-      documentElement: document.documentElement
-    };
+    ctx.document = createDocumentStub();
     ctx.setTimeout = jest.fn((fn) => fn());
     ctx.clearInterval = clearInterval;
     ctx.setInterval = setInterval;
@@ -215,11 +224,7 @@ describe('injected.js', () => {
     const ctx = {};
     ctx.window = ctx;
     ctx.console = { log: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() };
-    ctx.document = {
-      querySelectorAll: jest.fn(() => []),
-      body: {},
-      documentElement: document.documentElement
-    };
+    ctx.document = createDocumentStub();
     ctx.setTimeout = jest.fn((fn) => fn());
     ctx.clearInterval = clearInterval;
     ctx.setInterval = setInterval;
@@ -239,5 +244,38 @@ describe('injected.js', () => {
     loadScript('injected.js', ctx);
     expect(MockMO).toHaveBeenCalled();
     expect(mockObserve).toHaveBeenCalled();
+  });
+
+  test('updates completion case from page event', () => {
+    const ctx = {};
+    ctx.window = ctx;
+    ctx.console = { log: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() };
+    ctx.document = createDocumentStub();
+    ctx.setTimeout = jest.fn((fn) => fn());
+    ctx.clearInterval = clearInterval;
+    ctx.setInterval = setInterval;
+    ctx.WeakSet = WeakSet;
+    ctx.Object = Object;
+    ctx.JSON = JSON;
+    ctx.Array = Array;
+    ctx.CustomEvent = CustomEvent;
+    ctx.MutationObserver = jest.fn(() => ({
+      observe: jest.fn(),
+      disconnect: jest.fn()
+    }));
+    ctx.monaco = monaco;
+    ctx.__createCompletionProvider = function () {
+      return {
+        triggerCharacters: ['.'],
+        provideCompletionItems: jest.fn(() => ({ suggestions: [] }))
+      };
+    };
+
+    loadScript('injected.js', ctx);
+    ctx.document.dispatchEvent(new CustomEvent('__apexSetCompletionCase', {
+      detail: JSON.stringify({ completionCase: 'lower' })
+    }));
+
+    expect(ctx.__apexAutocompleteSettings.completionCase).toBe('lower');
   });
 });

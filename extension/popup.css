@@ -48,6 +48,45 @@ h1 {
   margin-bottom: 12px;
 }
 
+/* ── Settings ───────────────────────────────── */
+
+.settings-card {
+  background: #282a3e;
+  border: 1px solid #313244;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-row label {
+  font-size: 12px;
+  color: #a6adc8;
+  white-space: nowrap;
+}
+
+.setting-row select {
+  flex: 1;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  border: 1px solid #45475a;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.setting-row select:hover { border-color: #585b70; }
+.setting-row select:focus { border-color: #89b4fa; }
+
 /* ── Editor Cards ───────────────────────────── */
 
 .editors-list {
