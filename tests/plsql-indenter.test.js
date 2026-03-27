@@ -570,6 +570,13 @@ describe('plsql-indenter.js', () => {
       expect(result).toContain('begin');
       expect(result).toContain('end;');
     });
+
+    test('lowercases keywords when keywordCase is lower', () => {
+      var code = 'BEGIN\nNULL;\nEND;';
+      var result = format(code, { keywordCase: 'lower' });
+      expect(result).toContain('begin');
+      expect(result).toContain('end;');
+    });
   });
 
   // ── DPriver reference formatting ────────────────

@@ -27,6 +27,7 @@ describe('formatter.js', () => {
     ctx.MutationObserver = jest.fn(function () {
       return { observe: jest.fn(), disconnect: jest.fn() };
     });
+    ctx.__apexAutocompleteSettings = { completionCase: 'upper' };
 
     monaco = createMockMonaco();
     // Add registerDocumentFormattingEditProvider mock
@@ -170,6 +171,15 @@ describe('formatter.js', () => {
       expect(result).toContain('FROM');
       expect(result).toContain('WHERE');
     });
+
+    test('lowercases SQL keywords when preference is lower', () => {
+      ctx.__apexAutocompleteSettings.completionCase = 'lower';
+      var code = 'SELECT id, name FROM employees WHERE id = 1';
+      var result = ctx.__formatSql(code);
+      expect(result).toContain('select');
+      expect(result).toContain('from');
+      expect(result).toContain('where');
+    });
   });
 
   // ── SQL formatting with sql-formatter library ──
@@ -203,6 +213,15 @@ describe('formatter.js', () => {
       expect(mockFormat.mock.calls[0][1].keywordCase).toBe('preserve');
     });
 
+    test('passes lower keywordCase from preference to sql-formatter', () => {
+      var mockFormat = jest.fn(function (code, opts) { return code; });
+      ctx.sqlFormatter = { format: mockFormat };
+      ctx.__apexAutocompleteSettings.completionCase = 'lower';
+
+      ctx.__formatSql('SELECT 1');
+      expect(mockFormat.mock.calls[0][1].keywordCase).toBe('lower');
+    });
+
     test('falls back if sql-formatter throws', () => {
       ctx.sqlFormatter = {
         format: jest.fn(function () { throw new Error('parse error'); })
@@ -230,6 +249,14 @@ describe('formatter.js', () => {
       var code = 'select id, name from employees where id = 1';
       var result = ctx.__formatCode(code);
       expect(result).toContain('SELECT');
+    });
+
+    test('uses lowercase formatting for PL/SQL when preference is lower', () => {
+      ctx.__apexAutocompleteSettings.completionCase = 'lower';
+      var code = 'BEGIN\nNULL;\nEND;';
+      var result = ctx.__formatCode(code);
+      expect(result).toContain('begin');
+      expect(result).toContain('end;');
     });
 
     test('handles empty input', () => {
@@ -300,6 +327,22 @@ describe('formatter.js', () => {
       // The formatted output should have proper indentation
       expect(edits[0].text).toContain('BEGIN');
       expect(edits[0].text).toContain('END;');
+    });
+
+    test('formatting provider honors lowercase preference', () => {
+      ctx.__apexAutocompleteSettings.completionCase = 'lower';
+      var calls = monaco.languages.registerDocumentFormattingEditProvider.mock.calls;
+      var provider = calls[0][1];
+
+      var model = {
+        getValue: jest.fn(function () { return 'SELECT 1 FROM dual'; }),
+        getLineCount: jest.fn(function () { return 1; }),
+        getLineMaxColumn: jest.fn(function () { return 19; })
+      };
+
+      var edits = provider.provideDocumentFormattingEdits(model, { tabSize: 2 });
+      expect(edits[0].text).toContain('select');
+      expect(edits[0].text).toContain('from');
     });
   });
 

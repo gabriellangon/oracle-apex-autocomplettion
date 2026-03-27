@@ -116,7 +116,8 @@
   function formatPlsql(code, options) {
     options = options || {};
     var tabSize = options.tabSize || 2;
-    var upperCase = options.upperCaseKeywords !== false;
+    var keywordCase = options.keywordCase ||
+      (options.upperCaseKeywords === false ? 'preserve' : 'upper');
     var indent = '';
     for (var s = 0; s < tabSize; s++) indent += ' ';
 
@@ -382,8 +383,8 @@
 
       // Optionally uppercase keywords in the code portion
       var outputLine = trimmedOrig;
-      if (upperCase) {
-        outputLine = uppercaseKeywords(origLine.trim());
+      if (keywordCase !== 'preserve') {
+        outputLine = applyKeywordCase(origLine.trim(), keywordCase);
       }
 
       result.push(indentStr + outputLine);
@@ -730,7 +731,7 @@
    * (not inside strings or comments).
    * Uses the tokenizer to properly separate code from non-code segments.
    */
-  function uppercaseKeywords(origLine) {
+  function applyKeywordCase(origLine, keywordCase) {
     var keywords = [
       'DECLARE', 'BEGIN', 'END', 'EXCEPTION', 'WHEN', 'THEN', 'ELSE', 'ELSIF',
       'IF', 'LOOP', 'FOR', 'WHILE', 'EXIT', 'CONTINUE', 'RETURN', 'CASE',
@@ -760,7 +761,10 @@
         var segment = tokens[t].value;
         for (var k = 0; k < keywords.length; k++) {
           var re = new RegExp('\\b' + keywords[k] + '\\b', 'gi');
-          segment = segment.replace(re, keywords[k]);
+          var replacement = keywordCase === 'lower'
+            ? keywords[k].toLowerCase()
+            : keywords[k];
+          segment = segment.replace(re, replacement);
         }
         result += segment;
       } else {
@@ -770,6 +774,10 @@
     }
 
     return result;
+  }
+
+  function uppercaseKeywords(origLine) {
+    return applyKeywordCase(origLine, 'upper');
   }
 
   // Expose globally

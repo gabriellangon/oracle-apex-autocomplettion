@@ -20,6 +20,22 @@
   var LOG = '[APEX Formatter]';
   var hasLoggedMonacoWait = false;
 
+  function getKeywordCasePreference(options) {
+    options = options || {};
+
+    if (options.keywordCase === 'lower' || options.keywordCase === 'upper' || options.keywordCase === 'preserve') {
+      return options.keywordCase;
+    }
+    if (options.upperCaseKeywords === false) {
+      return 'preserve';
+    }
+    if (window.__apexAutocompleteSettings &&
+        window.__apexAutocompleteSettings.completionCase === 'lower') {
+      return 'lower';
+    }
+    return 'upper';
+  }
+
   // ── SQL vs PL/SQL detection ──────────────────
 
   /**
@@ -93,7 +109,7 @@
   function formatSql(code, options) {
     options = options || {};
     var tabSize = options.tabSize || 2;
-    var upperCase = options.upperCaseKeywords !== false;
+    var keywordCase = getKeywordCasePreference(options);
 
     // Use sql-formatter if available
     if (window.sqlFormatter && typeof window.sqlFormatter.format === 'function') {
@@ -101,23 +117,23 @@
         return window.sqlFormatter.format(code, {
           language: 'plsql',
           tabWidth: tabSize,
-          keywordCase: upperCase ? 'upper' : 'preserve',
+          keywordCase: keywordCase,
           linesBetweenQueries: 1
         });
       } catch (e) {
-        return formatSqlFallback(code, tabSize, upperCase);
+        return formatSqlFallback(code, tabSize, keywordCase);
       }
     }
 
     // Fallback: basic SQL formatting
-    return formatSqlFallback(code, tabSize, upperCase);
+    return formatSqlFallback(code, tabSize, keywordCase);
   }
 
   /**
    * Basic SQL formatter fallback when sql-formatter library is not available.
    * Handles common SQL clauses with simple line breaks and indentation.
    */
-  function formatSqlFallback(code, tabSize, upperCase) {
+  function formatSqlFallback(code, tabSize, keywordCase) {
     if (!code || !code.trim()) return code || '';
 
     var indent = '';
@@ -180,8 +196,8 @@
       var indentStr = '';
       for (var il = 0; il < level; il++) indentStr += indent;
 
-      if (upperCase) {
-        line = uppercaseSqlKeywords(line);
+      if (keywordCase !== 'preserve') {
+        line = applySqlKeywordCase(line, keywordCase);
       }
 
       formatted.push(indentStr + line);
@@ -193,7 +209,7 @@
   /**
    * Uppercase common SQL keywords.
    */
-  function uppercaseSqlKeywords(line) {
+  function applySqlKeywordCase(line, keywordCase) {
     var keywords = [
       'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'IN', 'EXISTS',
       'BETWEEN', 'LIKE', 'IS', 'NULL', 'AS', 'ON', 'JOIN', 'INNER',
@@ -208,7 +224,10 @@
     var result = line;
     for (var k = 0; k < keywords.length; k++) {
       var re = new RegExp('\\b' + keywords[k] + '\\b', 'gi');
-      result = result.replace(re, keywords[k]);
+      var replacement = keywordCase === 'lower'
+        ? keywords[k].toLowerCase()
+        : keywords[k];
+      result = result.replace(re, replacement);
     }
     return result;
   }
@@ -225,6 +244,10 @@
    */
   function formatCode(code, options) {
     if (!code || !code.trim()) return code || '';
+    options = options || {};
+    if (!options.keywordCase) {
+      options.keywordCase = getKeywordCasePreference(options);
+    }
 
     var lang = detectLanguageType(code);
 
@@ -259,7 +282,7 @@
 
         var formatted = formatCode(code, {
           tabSize: tabSize,
-          upperCaseKeywords: true
+          keywordCase: getKeywordCasePreference()
         });
 
         // Return a single edit that replaces the entire document
@@ -288,7 +311,7 @@
         var tabSize = (options && options.tabSize) || 2;
         var formatted = formatCode(code, {
           tabSize: tabSize,
-          upperCaseKeywords: true
+          keywordCase: getKeywordCasePreference()
         });
 
         return [{

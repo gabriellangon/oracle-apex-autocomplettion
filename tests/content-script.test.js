@@ -15,12 +15,17 @@ describe('content-script', () => {
     options = options || {};
     chrome = createMockChrome();
     const scriptElements = [];
+    const url = new URL(options.href || 'https://oracleapex.com/ords/r/apex/app-builder/page-designer');
 
     ctx = {};
     ctx.window = ctx;
     ctx.console = { log: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() };
     ctx.chrome = chrome;
-    ctx.location = { href: 'https://apex.example.com/app/101' };
+    ctx.location = {
+      href: url.href,
+      pathname: url.pathname,
+      search: url.search
+    };
     ctx.JSON = JSON;
     ctx.Object = Object;
     ctx.Array = Array;
@@ -97,6 +102,19 @@ describe('content-script', () => {
     expect(ctx.__apexAutocompleteInjected).toBe(true);
   });
 
+  test('exposes isLikelyApexPage helper and detects builder URL', () => {
+    const ctx = buildContext();
+    loadContentScript(ctx);
+    expect(typeof ctx.__isLikelyApexPage).toBe('function');
+    expect(ctx.__isLikelyApexPage()).toBe(true);
+  });
+
+  test('detects classic APEX builder f?p=4000 URLs', () => {
+    const ctx = buildContext({ href: 'https://example.com/ords/f?p=4000:4500:123456' });
+    loadContentScript(ctx);
+    expect(ctx.__isLikelyApexPage()).toBe(true);
+  });
+
   test('does not double-inject if guard is already set', () => {
     const ctx = buildContext();
     ctx.__apexAutocompleteInjected = true;
@@ -109,6 +127,16 @@ describe('content-script', () => {
     const ctx = buildContext();
     loadContentScript(ctx);
     expect(chrome.runtime.onMessage.addListener).toHaveBeenCalled();
+  });
+
+  test('does not initialize on non-APEX URLs', () => {
+    const ctx = buildContext({ href: 'https://example.com/docs/editor' });
+    loadContentScript(ctx);
+
+    expect(ctx.__isLikelyApexPage()).toBe(false);
+    expect(chrome.runtime.onMessage.addListener).not.toHaveBeenCalled();
+    expect(ctx.document.createElement).not.toHaveBeenCalled();
+    expect(ctx.MutationObserver).not.toHaveBeenCalled();
   });
 
   test('message listener handles GET_EDITORS', () => {

@@ -20,6 +20,43 @@
 
   // ── helpers ──────────────────────────────────
 
+  function isLikelyApexPage() {
+    var href = ((location && location.href) || '').toLowerCase();
+    if (!href) return false;
+
+    var apexBasePatterns = [
+      /\/ords\//,
+      /\/apex\//,
+      /\/pls\//,
+      /f\?p=/
+    ];
+    var builderPatterns = [
+      /\/app-builder(?:\/|$)/,
+      /\/page-designer(?:\/|$)/,
+      /\/shared-components(?:\/|$)/,
+      /\/sql-workshop(?:\/|$)/,
+      /\/object-browser(?:\/|$)/,
+      /\/team-development(?:\/|$)/,
+      /\/rest-workshop(?:\/|$)/
+    ];
+
+    var hasApexBase = apexBasePatterns.some(function (pattern) {
+      return pattern.test(href);
+    });
+    var hasBuilderRoute = builderPatterns.some(function (pattern) {
+      return pattern.test(href);
+    });
+
+    // Classic APEX builder URLs commonly run through builder app 4000.
+    if (/f\?p=4000:/i.test(href)) return true;
+
+    return hasApexBase && hasBuilderRoute;
+  }
+
+  window.__isLikelyApexPage = isLikelyApexPage;
+
+  if (!isLikelyApexPage()) return;
+
   function injectScript(file) {
     return new Promise(function (resolve, reject) {
       var s = document.createElement('script');
